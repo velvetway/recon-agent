@@ -72,14 +72,28 @@ make check TARGET=api.standoff365.com
 make run
 ```
 
+## Пайплайн разведки
+
+Задачи связаны в цепочку, каждый этап ставит следующий через scope-guard:
+
+```
+subdomain_enum (bbot)  ──▶  dns_resolve (Go net)  ──┬─▶  http_probe (httpx)
+   Domain→Subdomain          Subdomain→IP           └─▶  port_scan (nmap)
+                                                          IP→Port→Service
+```
+
+Оркестратор дедуплицирует задачи (один IP не сканируется дважды).
+
 ## Статус
 
 - [x] scope-guard (домены + wildcard + CIDR, приоритет out_of_scope) + тесты
-- [x] граф Neo4j (клиент, схема, upsert поддоменов)
-- [x] очередь задач + rate limiter (global / per-target)
-- [x] исполнитель BBOT (subdomain-enum, парсинг NDJSON)
-- [x] оркестратор (seed из скоупа, цикл observe/decide/act)
+- [x] граф Neo4j (клиент, схема, узлы Domain/Subdomain/IP/Service/Port)
+- [x] очередь задач + rate limiter (global / per-target) + дедуп
+- [x] subdomain-enum через BBOT (парсинг NDJSON)
+- [x] DNS-резолв (Subdomain→IP, чистый Go)
+- [x] http-probe через httpx (status, title, webserver, tech)
+- [x] port scan через nmap (top-100, определение сервисов)
+- [x] оркестратор (seed из скоупа, цепочка follow-up задач)
 - [ ] MCP-сервер для LLM
-- [ ] port scan / http probe / fingerprint
 - [ ] Finding-узлы и приоритизация
 ```

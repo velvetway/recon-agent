@@ -10,6 +10,7 @@ package orchestrator
 import (
 	"context"
 	"log/slog"
+	"sync"
 
 	"github.com/velvet1way/recon-agent/internal/queue"
 	"github.com/velvet1way/recon-agent/internal/scope"
@@ -20,6 +21,7 @@ type Orchestrator struct {
 	guard *scope.Guard
 	queue *queue.Queue
 	log   *slog.Logger
+	seen  sync.Map // ключ kind|target -> struct{}, дедуп задач
 }
 
 // New создаёт оркестратор.
@@ -27,9 +29,13 @@ func New(guard *scope.Guard, q *queue.Queue, log *slog.Logger) *Orchestrator {
 	return &Orchestrator{guard: guard, queue: q, log: log}
 }
 
-// Enqueue ставит задачу в очередь после проверки scope-guard.
-// Возвращает false, если цель заблокирована.
+// Enqueue ставит задачу в очередь после проверки scope-guard и дедупликации.
+// Возвращает false, если цель заблокирована или задача уже ставилась.
 func (o *Orchestrator) Enqueue(t queue.Task) bool {
+	key := t.Kind + "|" + t.Target
+	if _, dup := o.seen.LoadOrStore(key, struct{}{}); dup {
+		return false
+	}
 	if d := o.guard.Check(t.Target); !d.Allowed {
 		o.log.Warn("scope-guard заблокировал постановку задачи",
 			"kind", t.Kind, "target", t.Target, "reason", d.Reason)

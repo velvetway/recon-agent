@@ -56,6 +56,8 @@ func (s *Store) InitSchema(ctx context.Context) error {
 		"CREATE CONSTRAINT domain_name IF NOT EXISTS FOR (d:Domain) REQUIRE d.name IS UNIQUE",
 		"CREATE CONSTRAINT subdomain_name IF NOT EXISTS FOR (s:Subdomain) REQUIRE s.name IS UNIQUE",
 		"CREATE CONSTRAINT ip_addr IF NOT EXISTS FOR (i:IP) REQUIRE i.addr IS UNIQUE",
+		"CREATE CONSTRAINT service_url IF NOT EXISTS FOR (s:Service) REQUIRE s.url IS UNIQUE",
+		"CREATE CONSTRAINT port_key IF NOT EXISTS FOR (p:Port) REQUIRE (p.ip, p.number, p.proto) IS UNIQUE",
 	}
 	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
 		for _, c := range constraints {
@@ -87,6 +89,71 @@ func (s *Store) AddSubdomain(ctx context.Context, parentDomain, subdomain, sourc
 			SET s.source = $source, s.discovered_at = timestamp()
 			MERGE (d)-[:HAS_SUBDOMAIN]->(s)
 		`, map[string]any{"parent": parentDomain, "sub": subdomain, "source": source})
+		return err
+	})
+}
+
+// AddResolution связывает поддомен с IP-адресом (Subdomain-[:RESOLVES_TO]->IP).
+func (s *Store) AddResolution(ctx context.Context, subdomain, ip string) error {
+	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
+		_, err := tx.Run(ctx, `
+			MERGE (s:Subdomain {name: $sub})
+			MERGE (i:IP {addr: $ip})
+			SET i.discovered_at = coalesce(i.discovered_at, timestamp())
+			MERGE (s)-[:RESOLVES_TO]->(i)
+		`, map[string]any{"sub": subdomain, "ip": ip})
+		return err
+	})
+}
+
+// HTTPService — результат httpx-проба по хосту.
+type HTTPService struct {
+	Host       string
+	URL        string
+	StatusCode int
+	Title      string
+	WebServer  string
+	Tech       []string
+}
+
+// AddHTTPService записывает результат HTTP-проба на узел Subdomain.
+func (s *Store) AddHTTPService(ctx context.Context, svc HTTPService) error {
+	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
+		_, err := tx.Run(ctx, `
+			MERGE (s:Subdomain {name: $host})
+			MERGE (svc:Service {url: $url})
+			SET svc.status_code = $status,
+			    svc.title = $title,
+			    svc.webserver = $webserver,
+			    svc.tech = $tech,
+			    svc.probed_at = timestamp()
+			MERGE (s)-[:RUNS]->(svc)
+		`, map[string]any{
+			"host":      svc.Host,
+			"url":       svc.URL,
+			"status":    int64(svc.StatusCode),
+			"title":     svc.Title,
+			"webserver": svc.WebServer,
+			"tech":      svc.Tech,
+		})
+		return err
+	})
+}
+
+// AddPort записывает открытый порт на IP (IP-[:HAS_PORT]->Port).
+func (s *Store) AddPort(ctx context.Context, ip string, port int, proto, service string) error {
+	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
+		_, err := tx.Run(ctx, `
+			MERGE (i:IP {addr: $ip})
+			MERGE (p:Port {ip: $ip, number: $port, proto: $proto})
+			SET p.service = $service, p.discovered_at = timestamp()
+			MERGE (i)-[:HAS_PORT]->(p)
+		`, map[string]any{
+			"ip":      ip,
+			"port":    int64(port),
+			"proto":   proto,
+			"service": service,
+		})
 		return err
 	})
 }

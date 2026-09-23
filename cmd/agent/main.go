@@ -78,13 +78,21 @@ func main() {
 		fatal(log, "запись программы в граф", err)
 	}
 
-	scan := scanner.New(guard, store, *outDir, log)
+	// scan объявляем заранее: обработчик очереди ссылается на него,
+	// а сам scan создаётся после оркестратора (цикл зависимостей).
+	var scan *scanner.Scanner
 
 	// Обработчик очереди диспетчеризует задачи по видам.
 	handler := func(ctx context.Context, t queue.Task) error {
 		switch t.Kind {
 		case "subdomain_enum":
 			return scan.SubdomainEnum(ctx, t.Target)
+		case "dns_resolve":
+			return scan.ResolveDNS(ctx, t.Target)
+		case "http_probe":
+			return scan.HTTPProbe(ctx, t.Target)
+		case "port_scan":
+			return scan.PortScan(ctx, t.Target)
 		default:
 			return fmt.Errorf("неизвестный вид задачи: %s", t.Kind)
 		}
@@ -95,6 +103,7 @@ func main() {
 	q.Start(ctx)
 
 	orch := orchestrator.New(guard, q, log)
+	scan = scanner.New(guard, store, orch, *outDir, log)
 	roots := sc.RootDomains()
 	log.Info("старт разведки", "program", sc.Program, "roots", roots)
 	orch.SeedFromScope(ctx, roots)

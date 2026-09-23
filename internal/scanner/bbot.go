@@ -15,26 +15,33 @@ import (
 	"strings"
 
 	"github.com/velvet1way/recon-agent/internal/graph"
+	"github.com/velvet1way/recon-agent/internal/queue"
 	"github.com/velvet1way/recon-agent/internal/scope"
 )
 
+// Enqueuer ставит follow-up задачи (реализуется оркестратором,
+// который проверяет scope-guard и дедуплицирует).
+type Enqueuer interface {
+	Enqueue(t queue.Task) bool
+}
+
 // Scanner исполняет задачи разведки.
 type Scanner struct {
-	guard   *scope.Guard
-	store   *graph.Store
-	outDir  string
-	bbotBin string
-	log     *slog.Logger
+	guard  *scope.Guard
+	store  *graph.Store
+	next   Enqueuer
+	outDir string
+	log    *slog.Logger
 }
 
 // New создаёт исполнитель.
-func New(guard *scope.Guard, store *graph.Store, outDir string, log *slog.Logger) *Scanner {
+func New(guard *scope.Guard, store *graph.Store, next Enqueuer, outDir string, log *slog.Logger) *Scanner {
 	return &Scanner{
-		guard:   guard,
-		store:   store,
-		outDir:  outDir,
-		bbotBin: "bbot",
-		log:     log,
+		guard:  guard,
+		store:  store,
+		next:   next,
+		outDir: outDir,
+		log:    log,
 	}
 }
 
@@ -67,7 +74,7 @@ func (s *Scanner) SubdomainEnum(ctx context.Context, target string) error {
 		"--no-deps",   // не переустанавливать зависимости на каждом запуске
 	}
 
-	cmd := exec.CommandContext(ctx, s.bbotBin, args...)
+	cmd := exec.CommandContext(ctx, "bbot", args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("stdout pipe: %w", err)
@@ -105,6 +112,10 @@ func (s *Scanner) SubdomainEnum(ctx context.Context, target string) error {
 			continue
 		}
 		found++
+		// Follow-up: резолвим найденный поддомен в IP.
+		if s.next != nil {
+			s.next.Enqueue(queue.Task{Kind: "dns_resolve", Target: sub})
+		}
 	}
 
 	if err := cmd.Wait(); err != nil {
