@@ -1,0 +1,26 @@
+# Scope-конфиг программы bug bounty.
+# Двойной scope-guard читает этот файл: любое действие вне in_scope
+# либо попавшее в out_of_scope — блокируется.
+program: "Standoff365"
+platform: "standoff365"
+
+# Что разрешено трогать.
+in_scope:
+  domains:
+    - "*.standoff365.com"
+    - "standoff365.com"
+  cidrs: []          # напр. "203.0.113.0/24"
+  wildcards: true    # разрешить раскрытие поддоменов по wildcard
+
+# Что запрещено явно (имеет приоритет над in_scope).
+out_of_scope:
+  domains:
+    - "blog.standoff365.com"
+    - "docs.standoff365.com"
+  cidrs: []
+
+# Ограничения скорости, чтобы не словить бан на программе.
+rate_limits:
+  global_rps: 20          # суммарно по всем целям
+  per_target_rps: 5       # на один хост
+  max_concurrent_scans: 4 # одновременных задач сканирования

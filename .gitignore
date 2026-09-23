@@ -1,0 +1,19 @@
+# binaries
+/bin/
+recon-agent
+
+# bbot output
+/output/
+*.ndjson
+
+# env / secrets
+.env
+*.local.yaml
+
+# neo4j data (if mounted locally)
+/neo4j/data/
+/neo4j/logs/
+
+# go
+*.test
+*.out

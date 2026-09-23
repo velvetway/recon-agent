@@ -1,0 +1,18 @@
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: recon-neo4j
+    ports:
+      - "7474:7474"   # HTTP браузер
+      - "7687:7687"   # Bolt
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:-password}"
+      NEO4J_server_memory_pagecache_size: "512M"
+    volumes:
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
