@@ -1,4 +1,4 @@
-.PHONY: build test tidy neo4j-up neo4j-down run check scope-import archive cwe-extract cwe-atlas cwe-load
+.PHONY: build test tidy neo4j-up neo4j-down run check scope-import archive map cwe-extract cwe-atlas cwe-load
 
 build:
 	go build -o bin/agent ./cmd/agent
@@ -32,6 +32,11 @@ scope-import: build
 # make archive RUN=latest   — выгрузить в runs/<run_id>/
 archive: build
 	./bin/agent -archive $(or $(RUN),latest)
+
+# Сопоставление наблюдений прогона с CWE по правилам (docs/PLAN.md, фаза 5).
+# make map RUN=latest
+map: build
+	./bin/agent -map $(or $(RUN),latest)
 
 # Каталог CWE (см. docs/PLAN.md, фаза 0).
 # make cwe-extract CWE_XML=cwec_v4.14.xml   — пересобрать data/cwe/cwe.json из XML MITRE

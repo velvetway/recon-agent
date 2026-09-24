@@ -25,6 +25,7 @@ import (
 	"github.com/velvet1way/recon-agent/internal/archive"
 	"github.com/velvet1way/recon-agent/internal/config"
 	"github.com/velvet1way/recon-agent/internal/cwe"
+	"github.com/velvet1way/recon-agent/internal/cwemap"
 	"github.com/velvet1way/recon-agent/internal/filter"
 	"github.com/velvet1way/recon-agent/internal/graph"
 	"github.com/velvet1way/recon-agent/internal/orchestrator"
@@ -46,6 +47,10 @@ func main() {
 		archiveRun    = flag.String("archive", "", "выгрузить архив прогона из графа: run_id или 'latest'")
 		archiveOut    = flag.String("archive-out", "runs", "корневой каталог для архивов прогонов")
 		archiveFilter = flag.String("filter", "", "YAML-конфиг шумового фильтра (по умолчанию — встроенные значения)")
+
+		mapRun   = flag.String("map", "", "сопоставить наблюдения прогона с CWE по правилам: run_id или 'latest'")
+		rulesDir = flag.String("rules", "data/rules", "каталог со словарём правил *.yaml")
+		cwePath  = flag.String("cwe", "data/cwe/cwe.json", "путь к каталогу CWE")
 
 		scopeImport = flag.String("scope-import", "", "собрать scope.yaml из текста: путь к файлу или '-' для stdin")
 		importOut   = flag.String("scope-out", "", "куда записать scope.yaml при -scope-import (по умолчанию stdout)")
@@ -83,6 +88,14 @@ func main() {
 	if *archiveRun != "" {
 		if err := exportArchive(log, neo4jCfg, *archiveRun, *archiveOut, *outDir, *archiveFilter); err != nil {
 			fatal(log, "экспорт архива", err)
+		}
+		return
+	}
+
+	// Сопоставление наблюдений с CWE по правилам — читает граф, скоуп не нужен.
+	if *mapRun != "" {
+		if err := mapCWE(log, neo4jCfg, *mapRun, *cwePath, *rulesDir); err != nil {
+			fatal(log, "сопоставление с CWE", err)
 		}
 		return
 	}
@@ -283,6 +296,61 @@ func exportArchive(log *slog.Logger, cfg graph.Config, run, root, rawDir, filter
 		run, res.Dir, res.Observations, res.Assets, res.Tools)
 	if res.SecretsRedacted > 0 {
 		fmt.Printf("  вырезано типов секретов: %d\n", res.SecretsRedacted)
+	}
+	return nil
+}
+
+// mapCWE читает наблюдения прогона из графа, прогоняет их через словарь
+// правил и печатает кандидатов-CWE, сгруппированных по активу. Запись рёбер в
+// граф и полноценный отчёт — фаза 8; здесь — первый список для проверки.
+func mapCWE(log *slog.Logger, cfg graph.Config, run, cwePath, rulesDir string) error {
+	cat, err := cwe.Load(cwePath)
+	if err != nil {
+		return err
+	}
+	engine, err := cwemap.LoadDir(rulesDir, cat)
+	if err != nil {
+		return err
+	}
+	log.Info("правила загружены", "rules", engine.Len(), "cwe", cat.Len())
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	store, err := graph.New(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("подключение к neo4j: %w", err)
+	}
+	defer store.Close(ctx)
+
+	if run == "latest" {
+		if run, err = store.LatestRunID(ctx); err != nil {
+			return err
+		}
+		log.Info("последний прогон", "run", run)
+	}
+	obs, err := store.Observations(ctx, run)
+	if err != nil {
+		return err
+	}
+	findings := engine.Match(obs)
+	if len(findings) == 0 {
+		fmt.Printf("Прогон %s: кандидатов CWE по правилам не найдено (%d наблюдений).\n", run, len(obs))
+		return nil
+	}
+
+	fmt.Printf("Прогон %s: %d кандидатов CWE из %d наблюдений\n\n", run, len(findings), len(obs))
+	lastAsset := ""
+	for _, f := range findings {
+		if f.Asset != lastAsset {
+			fmt.Printf("• %s\n", f.Asset)
+			lastAsset = f.Asset
+		}
+		fmt.Printf("    CWE-%s  %.2f  %s\n", f.CWE, f.Confidence, f.CWETitle)
+		fmt.Printf("      сигнал: %s [%s]  правило: %s\n", f.Signal, f.EvidenceID, f.RuleID)
+		if f.Vector != "" {
+			fmt.Printf("      вектор: %s\n", f.Vector)
+		}
 	}
 	return nil
 }

@@ -1,0 +1,65 @@
+# Словарь правил «сигнал → CWE» (docs/PLAN.md, фаза 5).
+#
+# Правило срабатывает на наблюдении и даёт кандидата-CWE — не утверждение об
+# уязвимости, а вектор для проверки. cwe проверяется по каталогу (CWE-guard),
+# confidence в [0,1] — базовая уверенность эвристики (LLM уточнит в фазе 7).
+#
+# Виды наблюдений, которые выдаёт сканер: open_port (value "443/tcp",
+# evidence — имя сервиса от nmap), tech, webserver, http_service (value — URL).
+
+rules:
+  - id: ftp-cleartext
+    when: {kind: open_port, evidence_contains: "ftp"}
+    cwe: 319
+    confidence: 0.3
+    title: "FTP передаёт данные и учётные данные открытым текстом"
+    vector: "Проверить анонимный вход и передачу учётных данных без шифрования; предпочесть FTPS/SFTP."
+
+  - id: telnet-cleartext
+    when: {kind: open_port, evidence_contains: "telnet"}
+    cwe: 319
+    confidence: 0.45
+    title: "Telnet — управляющий канал открытым текстом"
+    vector: "Сессия и учётные данные передаются без шифрования; проверить наличие и замену на SSH."
+
+  - id: exposed-datastore
+    when: {kind: open_port, evidence_regex: "mysql|mariadb|postgresql|mongodb|redis|memcached|elasticsearch|ms-sql|mssql"}
+    cwe: 306
+    confidence: 0.4
+    title: "СУБД или хранилище доступно из сети"
+    vector: "Проверить доступ без аутентификации и дефолтные учётные данные; ограничить доступ по сети."
+
+  - id: exposed-rdp
+    when: {kind: open_port, evidence_regex: "ms-wbt-server|rdp"}
+    cwe: 284
+    confidence: 0.3
+    title: "RDP доступен из сети"
+    vector: "Проверить ограничение доступа к порту 3389 и защиту от перебора; вынести за VPN."
+
+  - id: exposed-admin-panel
+    when: {kind: tech, value_regex: "jenkins|gitlab|phpmyadmin|kibana|grafana|jupyter|adminer"}
+    cwe: 306
+    confidence: 0.3
+    title: "Панель управления или разработки доступна публично"
+    vector: "Проверить аутентификацию, дефолтные учётные данные и ограничение доступа к панели."
+
+  - id: server-version-disclosure
+    when: {kind: webserver, value_regex: "[0-9]+\\.[0-9]+"}
+    cwe: 200
+    confidence: 0.2
+    title: "Баннер сервера раскрывает версию ПО"
+    vector: "Версия в заголовке Server облегчает подбор эксплойтов; сопоставить с известными CVE, скрыть версию."
+
+  - id: wordpress-stack
+    when: {kind: tech, value_contains: "wordpress"}
+    cwe: 1395
+    confidence: 0.25
+    title: "Стек на WordPress"
+    vector: "Определить версию ядра и плагинов, сверить с известными уязвимостями компонентов."
+
+  - id: http-no-tls
+    when: {kind: http_service, value_regex: "^http://"}
+    cwe: 319
+    confidence: 0.2
+    title: "HTTP-сервис без TLS"
+    vector: "Проверить передачу чувствительных данных открытым текстом; принудительный HTTPS/HSTS."
