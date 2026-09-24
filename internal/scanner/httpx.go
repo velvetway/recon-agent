@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/velvet1way/recon-agent/internal/graph"
@@ -28,14 +29,7 @@ func (s *Scanner) HTTPProbe(ctx context.Context, host string) error {
 		return fmt.Errorf("scope-guard заблокировал цель %q: %s", host, d.Reason)
 	}
 
-	args := []string{
-		"-u", host,
-		"-json",
-		"-silent",
-		"-title", "-tech-detect", "-web-server", "-status-code",
-		"-no-color",
-	}
-	cmd := exec.CommandContext(ctx, "httpx", args...)
+	cmd := exec.CommandContext(ctx, "httpx", httpxArgs(host, s.cfg)...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return fmt.Errorf("stdout pipe: %w", err)
@@ -88,6 +82,25 @@ func (s *Scanner) HTTPProbe(ctx context.Context, host string) error {
 	}
 	s.log.Info("httpx завершён", "host", host, "services", found)
 	return nil
+}
+
+// httpxArgs собирает аргументы httpx: базовый пробы + обязательные заголовки
+// программы (-H) + лимит скорости (-rl), спущенный из конфига.
+func httpxArgs(host string, cfg Config) []string {
+	args := []string{
+		"-u", host,
+		"-json",
+		"-silent",
+		"-title", "-tech-detect", "-web-server", "-status-code",
+		"-no-color",
+	}
+	for _, h := range cfg.HTTPHeaders {
+		args = append(args, "-H", h.String())
+	}
+	if cfg.PerTargetRPS > 0 {
+		args = append(args, "-rl", strconv.Itoa(cfg.PerTargetRPS))
+	}
+	return args
 }
 
 // stripScheme убирает схему и путь, оставляя хост для scope-проверки.

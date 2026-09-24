@@ -32,17 +32,20 @@ type Scanner struct {
 	next   Enqueuer
 	outDir string
 	runID  string
+	cfg    Config
 	log    *slog.Logger
 }
 
-// New создаёт исполнитель. runID помечает все активы, найденные в этом прогоне.
-func New(guard *scope.Guard, store *graph.Store, next Enqueuer, outDir, runID string, log *slog.Logger) *Scanner {
+// New создаёт исполнитель. runID помечает все активы, найденные в этом
+// прогоне; cfg задаёт заголовки и лимит скорости для инструментов.
+func New(guard *scope.Guard, store *graph.Store, next Enqueuer, outDir, runID string, cfg Config, log *slog.Logger) *Scanner {
 	return &Scanner{
 		guard:  guard,
 		store:  store,
 		next:   next,
 		outDir: outDir,
 		runID:  runID,
+		cfg:    cfg,
 		log:    log,
 	}
 }

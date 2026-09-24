@@ -49,6 +49,12 @@ type Scope struct {
 		CIDRs   []string `yaml:"cidrs"`
 	} `yaml:"out_of_scope"`
 
+	// HTTPHeaders — заголовки, добавляемые к каждому HTTP-запросу инструментов
+	// (например, обязательный для программы "X-BugBounty: <id>"). Формат
+	// "Имя: значение". Секреты сюда класть не нужно — их лучше передавать через
+	// переменную окружения RECON_HTTP_HEADERS, чтобы значение не попало в файл.
+	HTTPHeaders []string `yaml:"http_headers"`
+
 	RateLimits RateLimits `yaml:"rate_limits"`
 }
 

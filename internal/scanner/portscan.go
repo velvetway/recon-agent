@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"os/exec"
+	"strconv"
 )
 
 // nmapRun — минимальная модель XML-вывода nmap (-oX).
@@ -25,6 +26,22 @@ type nmapRun struct {
 	} `xml:"host"`
 }
 
+// nmapArgs собирает аргументы nmap: топ-100 портов, лёгкое определение
+// сервиса, и потолок скорости --max-rate (пакетов/с) из конфига, чтобы не
+// превышать лимит программы.
+func nmapArgs(ip string, cfg Config) []string {
+	args := []string{
+		"-Pn",
+		"--top-ports", "100",
+		"-sV", "--version-light",
+		"-T3",
+	}
+	if cfg.PerTargetRPS > 0 {
+		args = append(args, "--max-rate", strconv.Itoa(cfg.PerTargetRPS))
+	}
+	return append(args, "-oX", "-", ip)
+}
+
 // PortScan запускает nmap по IP (top-100 портов, определение сервисов),
 // пишет открытые порты в граф как Port.
 func (s *Scanner) PortScan(ctx context.Context, ip string) error {
@@ -32,16 +49,7 @@ func (s *Scanner) PortScan(ctx context.Context, ip string) error {
 		return fmt.Errorf("scope-guard заблокировал цель %q: %s", ip, d.Reason)
 	}
 
-	// Умеренный, не-агрессивный дефолт: топ-100 портов, лёгкое определение сервиса.
-	args := []string{
-		"-Pn",
-		"--top-ports", "100",
-		"-sV", "--version-light",
-		"-T3",
-		"-oX", "-", // XML в stdout
-		ip,
-	}
-	out, err := exec.CommandContext(ctx, "nmap", args...).Output()
+	out, err := exec.CommandContext(ctx, "nmap", nmapArgs(ip, s.cfg)...).Output()
 	if err != nil {
 		return fmt.Errorf("запуск nmap: %w", err)
 	}

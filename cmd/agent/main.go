@@ -168,10 +168,24 @@ func main() {
 	q := queue.New(sc.RateLimits.MaxConcurrent, limiter, handler, log)
 	q.Start(ctx)
 
+	// Заголовки: сперва из scope.yaml, затем из RECON_HTTP_HEADERS (env
+	// переопределяет — там место секретам вроде обязательного X-BugBounty).
+	hdrLines := append([]string{}, sc.HTTPHeaders...)
+	if env := os.Getenv("RECON_HTTP_HEADERS"); env != "" {
+		hdrLines = append(hdrLines, strings.Split(env, "\n")...)
+	}
+	headers, err := scanner.ParseHeaders(hdrLines)
+	if err != nil {
+		fatal(log, "разбор HTTP-заголовков", err)
+	}
+	scanCfg := scanner.Config{HTTPHeaders: headers, PerTargetRPS: sc.RateLimits.PerTargetRPS}
+
 	orch := orchestrator.New(guard, q, sc.Profile, log)
-	scan = scanner.New(guard, store, orch, *outDir, runID, log)
+	scan = scanner.New(guard, store, orch, *outDir, runID, scanCfg, log)
 	roots := sc.RootDomains()
-	log.Info("старт разведки", "program", sc.Program, "profile", sc.Profile, "run", runID, "roots", roots)
+	// Логируем только имена заголовков, не значения — чтобы не светить секрет.
+	log.Info("старт разведки", "program", sc.Program, "profile", sc.Profile, "run", runID,
+		"roots", roots, "headers", scanCfg.Names(), "per_target_rps", sc.RateLimits.PerTargetRPS)
 	orch.SeedFromScope(ctx, roots)
 
 	// Прогон завершается сам, когда очередь опустела; Ctrl+C прерывает досрочно.
