@@ -12,6 +12,10 @@
 // Каталог слабостей (справочник, не зависит от программы):
 //
 //	(CWE)-[:CHILD_OF]->(CWE)
+//
+// Прогоны и наблюдения (источник для архива, см. observation.go):
+//
+//	(Program)-[:HAS_RUN]->(Run)-[:HAS_OBSERVATION]->(Observation)
 package graph
 
 import (
@@ -63,6 +67,9 @@ func (s *Store) InitSchema(ctx context.Context) error {
 		"CREATE CONSTRAINT service_url IF NOT EXISTS FOR (s:Service) REQUIRE s.url IS UNIQUE",
 		"CREATE CONSTRAINT port_key IF NOT EXISTS FOR (p:Port) REQUIRE (p.ip, p.number, p.proto) IS UNIQUE",
 		"CREATE CONSTRAINT cwe_id IF NOT EXISTS FOR (c:CWE) REQUIRE c.id IS UNIQUE",
+		"CREATE CONSTRAINT run_id IF NOT EXISTS FOR (r:Run) REQUIRE r.id IS UNIQUE",
+		"CREATE CONSTRAINT observation_id IF NOT EXISTS FOR (o:Observation) REQUIRE o.id IS UNIQUE",
+		"CREATE INDEX observation_run IF NOT EXISTS FOR (o:Observation) ON (o.run_id)",
 	}
 	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
 		for _, c := range constraints {

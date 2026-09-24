@@ -113,6 +113,7 @@ func (s *Scanner) SubdomainEnum(ctx context.Context, target string) error {
 			s.log.Error("запись поддомена в граф", "sub", sub, "err", err)
 			continue
 		}
+		s.observe(ctx, sub, "bbot", "subdomain", sub, ev.Module)
 		found++
 		// Follow-up: резолвим найденный поддомен в IP.
 		if s.next != nil {

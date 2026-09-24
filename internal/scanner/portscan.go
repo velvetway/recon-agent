@@ -61,6 +61,8 @@ func (s *Scanner) PortScan(ctx context.Context, ip string) error {
 				s.log.Error("запись порта в граф", "ip", ip, "port", p.PortID, "err", err)
 				continue
 			}
+			s.observe(ctx, ip, "nmap", "open_port",
+				fmt.Sprintf("%d/%s", p.PortID, p.Protocol), p.Service.Name)
 			found++
 		}
 	}

@@ -72,6 +72,15 @@ func (s *Scanner) HTTPProbe(ctx context.Context, host string) error {
 			s.log.Error("запись HTTP-сервиса в граф", "host", host, "err", err)
 			continue
 		}
+		// Наблюдения: сам сервис, веб-сервер и каждая технология — отдельными
+		// фактами, чтобы правила фазы 5 могли ссылаться на них по одному.
+		s.observe(ctx, host, "httpx", "http_service", r.URL, fmt.Sprintf("%d %s", r.StatusCode, r.Title))
+		if r.WebServer != "" {
+			s.observe(ctx, host, "httpx", "webserver", r.WebServer, r.URL)
+		}
+		for _, tech := range r.Tech {
+			s.observe(ctx, host, "httpx", "tech", tech, r.URL)
+		}
 		found++
 	}
 	if err := cmd.Wait(); err != nil {

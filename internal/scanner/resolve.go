@@ -36,6 +36,7 @@ func (s *Scanner) ResolveDNS(ctx context.Context, host string) error {
 			s.log.Error("запись резолва в граф", "host", host, "ip", ip, "err", err)
 			continue
 		}
+		s.observe(ctx, host, "dns", "dns_a", ip, "resolver")
 		if s.next != nil {
 			s.next.Enqueue(queue.Task{Kind: queue.KindPortScan, Target: ip})
 		}

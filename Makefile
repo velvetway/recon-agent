@@ -1,4 +1,4 @@
-.PHONY: build test tidy neo4j-up neo4j-down run check scope-import cwe-extract cwe-atlas cwe-load
+.PHONY: build test tidy neo4j-up neo4j-down run check scope-import archive cwe-extract cwe-atlas cwe-load
 
 build:
 	go build -o bin/agent ./cmd/agent
@@ -27,6 +27,11 @@ check: build
 # make scope-import IN=targets.txt PROGRAM=Example PLATFORM=hackerone
 scope-import: build
 	./bin/agent -scope-import $(IN) -scope-out $(or $(SCOPE),configs/scope.yaml) -program "$(PROGRAM)" -platform "$(PLATFORM)"
+
+# Архив прогона из графа (docs/PLAN.md, фаза 3).
+# make archive RUN=latest   — выгрузить в runs/<run_id>/
+archive: build
+	./bin/agent -archive $(or $(RUN),latest)
 
 # Каталог CWE (см. docs/PLAN.md, фаза 0).
 # make cwe-extract CWE_XML=cwec_v4.14.xml   — пересобрать data/cwe/cwe.json из XML MITRE

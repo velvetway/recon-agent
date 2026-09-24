@@ -22,6 +22,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/velvet1way/recon-agent/internal/archive"
 	"github.com/velvet1way/recon-agent/internal/config"
 	"github.com/velvet1way/recon-agent/internal/cwe"
 	"github.com/velvet1way/recon-agent/internal/graph"
@@ -40,6 +41,9 @@ func main() {
 		neo4jURI  = flag.String("neo4j", envOr("NEO4J_URI", "neo4j://localhost:7687"), "URI Neo4j")
 		neo4jUser = flag.String("neo4j-user", envOr("NEO4J_USER", "neo4j"), "пользователь Neo4j")
 		cweLoad   = flag.String("cwe-load", "", "загрузить каталог CWE (data/cwe/cwe.json) в Neo4j и выйти")
+
+		archiveRun = flag.String("archive", "", "выгрузить архив прогона из графа: run_id или 'latest'")
+		archiveOut = flag.String("archive-out", "runs", "корневой каталог для архивов прогонов")
 
 		scopeImport = flag.String("scope-import", "", "собрать scope.yaml из текста: путь к файлу или '-' для stdin")
 		importOut   = flag.String("scope-out", "", "куда записать scope.yaml при -scope-import (по умолчанию stdout)")
@@ -69,6 +73,14 @@ func main() {
 	if *cweLoad != "" {
 		if err := loadCWE(log, neo4jCfg, *cweLoad); err != nil {
 			fatal(log, "загрузка каталога CWE", err)
+		}
+		return
+	}
+
+	// Экспорт архива прогона — читает граф, скоуп не нужен.
+	if *archiveRun != "" {
+		if err := exportArchive(log, neo4jCfg, *archiveRun, *archiveOut, *outDir); err != nil {
+			fatal(log, "экспорт архива", err)
 		}
 		return
 	}
@@ -228,6 +240,36 @@ func stdinIsTerminal() bool {
 		return false
 	}
 	return true
+}
+
+// exportArchive выгружает прогон из графа в архив на диске. run — конкретный
+// run_id или "latest". rawDir — каталог сырого вывода сканеров (может быть пуст).
+func exportArchive(log *slog.Logger, cfg graph.Config, run, root, rawDir string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	store, err := graph.New(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("подключение к neo4j: %w", err)
+	}
+	defer store.Close(ctx)
+
+	if run == "latest" {
+		run, err = store.LatestRunID(ctx)
+		if err != nil {
+			return err
+		}
+		log.Info("последний прогон", "run", run)
+	}
+	// rawDir прогона лежит в подпапке по имени прогонной цели; передаём весь
+	// каталог сканов — copyRaw берёт то, что есть, и не падает, если пусто.
+	res, err := archive.Export(ctx, store, run, root, rawDir)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Архив прогона %s: %s\n  %d наблюдений, %d активов, %d инструментов\n",
+		run, res.Dir, res.Observations, res.Assets, res.Tools)
+	return nil
 }
 
 // loadCWE читает каталог, проверяет его и загружает в граф.
