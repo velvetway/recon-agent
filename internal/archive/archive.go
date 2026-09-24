@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/velvet1way/recon-agent/internal/filter"
 	"github.com/velvet1way/recon-agent/internal/graph"
 )
 
@@ -36,10 +37,24 @@ type Store interface {
 
 // Result — итог экспорта.
 type Result struct {
-	Dir          string
-	Observations int
-	Tools        int
-	Assets       int
+	Dir             string
+	Observations    int
+	Tools           int
+	Assets          int
+	Kept            int // наблюдений в by-asset после фильтра
+	SecretsRedacted int // типов вырезанных секретов
+}
+
+// FilterInfo — сводка фильтрации в манифесте.
+type FilterInfo struct {
+	Applied         bool     `json:"applied"`
+	Kept            int      `json:"kept,omitempty"`
+	Deduped         int      `json:"deduped,omitempty"`
+	Capped          int      `json:"capped,omitempty"`
+	DroppedParking  []string `json:"dropped_parking,omitempty"`
+	CDN             []string `json:"cdn,omitempty"`
+	DroppedCDN      []string `json:"dropped_cdn,omitempty"`
+	SecretsRedacted []string `json:"secrets_redacted,omitempty"`
 }
 
 // Manifest — содержимое manifest.json.
@@ -54,6 +69,7 @@ type Manifest struct {
 	Tools        map[string]int    `json:"tools"`  // инструмент → число наблюдений
 	Assets       []string          `json:"assets"` // отсортированный список активов
 	Files        map[string]string `json:"files"`  // относительный путь → sha256
+	Filtering    *FilterInfo       `json:"filtering,omitempty"`
 }
 
 // obsLine — одна строка by-tool/*.jsonl.
@@ -65,10 +81,18 @@ type obsLine struct {
 	Evidence string `json:"evidence,omitempty"`
 }
 
+// Options — необязательные параметры экспорта.
+type Options struct {
+	// Filter применяется к наблюдениям для by-asset (внешний вход). nil —
+	// без шумового фильтра; санитайзер секретов работает всегда.
+	Filter *filter.Filter
+}
+
 // Export собирает архив прогона в root/<runID>. rawSrc — каталог с сырым
-// выводом инструментов; если он есть, копируется в raw/. Пустой rawSrc
-// пропускается.
-func Export(ctx context.Context, store Store, runID, root, rawSrc string) (Result, error) {
+// выводом инструментов; если он есть, копируется в raw/ как есть (форензный
+// оригинал). Все производные файлы (by-tool, by-asset) проходят через
+// санитайзер секретов; by-asset дополнительно через шумовой фильтр из opts.
+func Export(ctx context.Context, store Store, runID, root, rawSrc string, opts Options) (Result, error) {
 	info, err := store.Run(ctx, runID)
 	if err != nil {
 		return Result{}, err
@@ -85,10 +109,23 @@ func Export(ctx context.Context, store Store, runID, root, rawSrc string) (Resul
 		}
 	}
 
+	// Санитайзер секретов — на всё производное, до фильтра. raw/ не трогаем.
+	secretSet := map[string]bool{}
+	obs = sanitizeObs(obs, secretSet)
+
+	// by-asset: отфильтрованный набор; by-tool — полный (для отладки).
+	assetObs := obs
+	var frep filter.Report
+	if opts.Filter != nil {
+		assetObs, frep = opts.Filter.Apply(obs)
+	}
+
 	byTool := map[string][]graph.Observation{}
 	byAsset := map[string][]graph.Observation{}
 	for _, o := range obs {
 		byTool[o.Tool] = append(byTool[o.Tool], o)
+	}
+	for _, o := range assetObs {
 		byAsset[o.Asset] = append(byAsset[o.Asset], o)
 	}
 
@@ -142,6 +179,7 @@ func Export(ctx context.Context, store Store, runID, root, rawSrc string) (Resul
 		RunID: info.ID, Program: info.Program, Platform: info.Platform, Profile: info.Profile,
 		StartedAt: msToRFC3339(info.StartedAt), GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		Observations: len(obs), Tools: tools, Assets: assets, Files: files,
+		Filtering: filterSummary(opts.Filter != nil, frep, setKeys(secretSet)),
 	}
 	manBytes, err := json.MarshalIndent(man, "", "  ")
 	if err != nil {
@@ -151,7 +189,57 @@ func Export(ctx context.Context, store Store, runID, root, rawSrc string) (Resul
 		return Result{}, err
 	}
 
-	return Result{Dir: dir, Observations: len(obs), Tools: len(tools), Assets: len(assets)}, nil
+	return Result{
+		Dir: dir, Observations: len(obs), Tools: len(tools), Assets: len(assets),
+		Kept: len(assetObs), SecretsRedacted: len(secretSet),
+	}, nil
+}
+
+// sanitizeObs прогоняет value и evidence каждого наблюдения через санитайзер
+// секретов, накапливая типы найденных секретов в set.
+func sanitizeObs(obs []graph.Observation, set map[string]bool) []graph.Observation {
+	out := make([]graph.Observation, len(obs))
+	for i, o := range obs {
+		v, hv := filter.Sanitize(o.Value)
+		e, he := filter.Sanitize(o.Evidence)
+		o.Value, o.Evidence = v, e
+		for _, h := range hv {
+			set[h] = true
+		}
+		for _, h := range he {
+			set[h] = true
+		}
+		out[i] = o
+	}
+	return out
+}
+
+func filterSummary(applied bool, r filter.Report, secrets []string) *FilterInfo {
+	if !applied && len(secrets) == 0 {
+		return nil
+	}
+	fi := &FilterInfo{Applied: applied, SecretsRedacted: secrets}
+	if applied {
+		fi.Kept = r.Kept
+		fi.Deduped = r.Deduped
+		fi.Capped = r.Capped
+		fi.DroppedParking = r.DroppedPark
+		fi.CDN = r.CDN
+		fi.DroppedCDN = r.DroppedCDN
+	}
+	return fi
+}
+
+func setKeys(m map[string]bool) []string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // assetDossier — markdown-досье на один актив: факты, сгруппированные по виду.

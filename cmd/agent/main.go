@@ -25,6 +25,7 @@ import (
 	"github.com/velvet1way/recon-agent/internal/archive"
 	"github.com/velvet1way/recon-agent/internal/config"
 	"github.com/velvet1way/recon-agent/internal/cwe"
+	"github.com/velvet1way/recon-agent/internal/filter"
 	"github.com/velvet1way/recon-agent/internal/graph"
 	"github.com/velvet1way/recon-agent/internal/orchestrator"
 	"github.com/velvet1way/recon-agent/internal/queue"
@@ -42,8 +43,9 @@ func main() {
 		neo4jUser = flag.String("neo4j-user", envOr("NEO4J_USER", "neo4j"), "пользователь Neo4j")
 		cweLoad   = flag.String("cwe-load", "", "загрузить каталог CWE (data/cwe/cwe.json) в Neo4j и выйти")
 
-		archiveRun = flag.String("archive", "", "выгрузить архив прогона из графа: run_id или 'latest'")
-		archiveOut = flag.String("archive-out", "runs", "корневой каталог для архивов прогонов")
+		archiveRun    = flag.String("archive", "", "выгрузить архив прогона из графа: run_id или 'latest'")
+		archiveOut    = flag.String("archive-out", "runs", "корневой каталог для архивов прогонов")
+		archiveFilter = flag.String("filter", "", "YAML-конфиг шумового фильтра (по умолчанию — встроенные значения)")
 
 		scopeImport = flag.String("scope-import", "", "собрать scope.yaml из текста: путь к файлу или '-' для stdin")
 		importOut   = flag.String("scope-out", "", "куда записать scope.yaml при -scope-import (по умолчанию stdout)")
@@ -79,7 +81,7 @@ func main() {
 
 	// Экспорт архива прогона — читает граф, скоуп не нужен.
 	if *archiveRun != "" {
-		if err := exportArchive(log, neo4jCfg, *archiveRun, *archiveOut, *outDir); err != nil {
+		if err := exportArchive(log, neo4jCfg, *archiveRun, *archiveOut, *outDir, *archiveFilter); err != nil {
 			fatal(log, "экспорт архива", err)
 		}
 		return
@@ -243,8 +245,18 @@ func stdinIsTerminal() bool {
 }
 
 // exportArchive выгружает прогон из графа в архив на диске. run — конкретный
-// run_id или "latest". rawDir — каталог сырого вывода сканеров (может быть пуст).
-func exportArchive(log *slog.Logger, cfg graph.Config, run, root, rawDir string) error {
+// run_id или "latest". rawDir — каталог сырого вывода сканеров (может быть
+// пуст). filterPath — YAML-конфиг шумового фильтра; пустой — значения по
+// умолчанию. Санитайзер секретов работает всегда.
+func exportArchive(log *slog.Logger, cfg graph.Config, run, root, rawDir, filterPath string) error {
+	fcfg := filter.Default()
+	if filterPath != "" {
+		var err error
+		if fcfg, err = filter.Load(filterPath); err != nil {
+			return err
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -263,12 +275,15 @@ func exportArchive(log *slog.Logger, cfg graph.Config, run, root, rawDir string)
 	}
 	// rawDir прогона лежит в подпапке по имени прогонной цели; передаём весь
 	// каталог сканов — copyRaw берёт то, что есть, и не падает, если пусто.
-	res, err := archive.Export(ctx, store, run, root, rawDir)
+	res, err := archive.Export(ctx, store, run, root, rawDir, archive.Options{Filter: filter.New(fcfg)})
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Архив прогона %s: %s\n  %d наблюдений, %d активов, %d инструментов\n",
+	fmt.Printf("Архив прогона %s: %s\n  %d наблюдений, %d активов в досье, %d инструментов\n",
 		run, res.Dir, res.Observations, res.Assets, res.Tools)
+	if res.SecretsRedacted > 0 {
+		fmt.Printf("  вырезано типов секретов: %d\n", res.SecretsRedacted)
+	}
 	return nil
 }
 

@@ -46,7 +46,7 @@ func sampleStore() fakeStore {
 
 func TestExportLayout(t *testing.T) {
 	root := t.TempDir()
-	res, err := Export(context.Background(), sampleStore(), "run-20260101-120000", root, "")
+	res, err := Export(context.Background(), sampleStore(), "run-20260101-120000", root, "", Options{})
 	if err != nil {
 		t.Fatalf("Export: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestExportRaw(t *testing.T) {
 	os.WriteFile(filepath.Join(rawSrc, "bbot", "output.ndjson"), []byte(`{"x":1}`), 0o644)
 
 	root := t.TempDir()
-	res, err := Export(context.Background(), sampleStore(), "run-20260101-120000", root, rawSrc)
+	res, err := Export(context.Background(), sampleStore(), "run-20260101-120000", root, rawSrc, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestExportNameCollision(t *testing.T) {
 		obs:  []graph.Observation{mk("a:b"), mk("a/b")}, // оба → "a_b"
 	}
 	root := t.TempDir()
-	res, err := Export(context.Background(), st, run, root, "")
+	res, err := Export(context.Background(), st, run, root, "", Options{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,0 +1,29 @@
+# Конфиг шумового фильтра (docs/PLAN.md, фаза 4).
+# Передаётся через: agent -archive latest -filter data/filter/filter.yaml
+# Незаданные поля берутся из встроенных значений по умолчанию.
+# Санитайзер секретов работает всегда и не настраивается отсюда.
+
+# Маркеры парковочных страниц: если значение или evidence наблюдения содержит
+# такую подстроку, актив считается мёртвым и целиком исключается из досье.
+parking_markers:
+  - "domain for sale"
+  - "buy this domain"
+  - "this domain is for sale"
+  - "parked"
+  - "coming soon"
+  - "under construction"
+
+# Маркеры CDN/WAF (по tech/webserver). Актив за CDN помечается в манифесте;
+# удаляется только при drop_cdn: true (за CDN может стоять валидная цель).
+cdn_markers:
+  - "cloudflare"
+  - "akamai"
+  - "fastly"
+  - "sucuri"
+  - "incapsula"
+  - "cloudfront"
+drop_cdn: false
+
+# Лимиты размера досье, чтобы вход LLM не разрастался. 0 — без лимита.
+max_per_kind: 50    # наблюдений одного вида на актив
+max_per_asset: 200  # всего наблюдений на актив
