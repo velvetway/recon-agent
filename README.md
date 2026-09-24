@@ -95,10 +95,40 @@ subdomain_enum (bbot)  ──▶  dns_resolve (Go net)  ──┬─▶  http_pr
 - [x] port scan через nmap (top-100, определение сервисов)
 - [x] оркестратор (seed из скоупа, цепочка follow-up задач)
 - [x] каталог CWE: `data/cwe/cwe.json` (938 слабостей, RU+EN), загрузка в граф, HTML-атлас
+- [x] импорт скоупа из текста или файла в `scope.yaml` со сводкой перед записью
 - [ ] MCP-сервер для LLM
 - [ ] Finding-узлы и приоритизация
 
 Полный план развития — [docs/PLAN.md](docs/PLAN.md).
+
+## Скоуп из текста
+
+Скоуп можно не писать руками, а вставить как есть со страницы программы:
+по одной цели в строке, можно через запятую.
+
+```text
+In scope:
+- *.example.com
+- https://api.example.com/v2   (Public API)
+- app.example.com:8443, shop.example.com
+- 203.0.113.0/24
+Out of scope:
+- blog.example.com
+!203.0.113.128/25
+```
+
+```bash
+make scope-import IN=targets.txt PROGRAM=Example PLATFORM=hackerone
+# или без make; '-' — читать из stdin, без -scope-out — YAML в stdout
+pbpaste | ./bin/agent -scope-import - -program Example
+```
+
+Понимает домены, `*.wildcard`, URL (берётся хост), `host:port`, IP (станет
+`/32` или `/128`) и CIDR. Вне скоупа — префикс `!` или заголовок секции
+(`Out of scope:`, `Вне скоупа:`). Текст после цели (описание) отбрасывается.
+Перед записью команда печатает сводку: что попало в скоуп, что вне, какие
+строки отброшены и почему. Файл записывается только после подтверждения или с
+флагом `-yes`.
 
 ## Каталог CWE
 

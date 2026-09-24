@@ -1,4 +1,4 @@
-.PHONY: build test tidy neo4j-up neo4j-down run check cwe-extract cwe-atlas cwe-load
+.PHONY: build test tidy neo4j-up neo4j-down run check scope-import cwe-extract cwe-atlas cwe-load
 
 build:
 	go build -o bin/agent ./cmd/agent
@@ -22,6 +22,11 @@ run: build
 # make check TARGET=api.standoff365.com
 check: build
 	./bin/agent -scope $(or $(SCOPE),configs/scope.yaml) -check $(TARGET)
+
+# Скоуп из текста (docs/PLAN.md, фаза 1): сводка, подтверждение, запись.
+# make scope-import IN=targets.txt PROGRAM=Example PLATFORM=hackerone
+scope-import: build
+	./bin/agent -scope-import $(IN) -scope-out $(or $(SCOPE),configs/scope.yaml) -program "$(PROGRAM)" -platform "$(PLATFORM)"
 
 # Каталог CWE (см. docs/PLAN.md, фаза 0).
 # make cwe-extract CWE_XML=cwec_v4.14.xml   — пересобрать data/cwe/cwe.json из XML MITRE

@@ -5,15 +5,20 @@
 //	agent -scope configs/scope.yaml            # запустить разведку
 //	agent -scope configs/scope.yaml -check host # проверить цель scope-guard'ом
 //	agent -cwe-load data/cwe/cwe.json           # загрузить каталог CWE в Neo4j
+//	agent -scope-import targets.txt -scope-out configs/scope.yaml -program Example
+//	pbpaste | agent -scope-import -             # скоуп из буфера → YAML в stdout
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/velvet1way/recon-agent/internal/config"
@@ -23,6 +28,7 @@ import (
 	"github.com/velvet1way/recon-agent/internal/queue"
 	"github.com/velvet1way/recon-agent/internal/scanner"
 	"github.com/velvet1way/recon-agent/internal/scope"
+	"github.com/velvet1way/recon-agent/internal/scopeimport"
 )
 
 func main() {
@@ -33,10 +39,24 @@ func main() {
 		neo4jURI  = flag.String("neo4j", envOr("NEO4J_URI", "neo4j://localhost:7687"), "URI Neo4j")
 		neo4jUser = flag.String("neo4j-user", envOr("NEO4J_USER", "neo4j"), "пользователь Neo4j")
 		cweLoad   = flag.String("cwe-load", "", "загрузить каталог CWE (data/cwe/cwe.json) в Neo4j и выйти")
+
+		scopeImport = flag.String("scope-import", "", "собрать scope.yaml из текста: путь к файлу или '-' для stdin")
+		importOut   = flag.String("scope-out", "", "куда записать scope.yaml при -scope-import (по умолчанию stdout)")
+		program     = flag.String("program", "", "название программы для -scope-import")
+		platform    = flag.String("platform", "", "платформа для -scope-import (hackerone, bugcrowd, standoff365...)")
+		assumeYes   = flag.Bool("yes", false, "не спрашивать подтверждения при записи файла")
 	)
 	flag.Parse()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	// Импорт скоупа из текста — до загрузки scope.yaml, которого ещё может не быть.
+	if *scopeImport != "" {
+		if err := importScope(*scopeImport, *importOut, *program, *platform, *assumeYes); err != nil {
+			fatal(log, "импорт скоупа", err)
+		}
+		return
+	}
 
 	neo4jCfg := graph.Config{
 		URI:      *neo4jURI,
@@ -124,6 +144,75 @@ func main() {
 	<-ctx.Done()
 	log.Info("остановка, ждём завершения задач")
 	q.Shutdown()
+}
+
+// importScope разбирает скоуп из текста, показывает сводку в stderr и пишет
+// YAML в stdout или в файл. Перед записью файла спрашивает подтверждение
+// (или требует -yes, если спросить нельзя).
+func importScope(src, dst, program, platform string, yes bool) error {
+	var in io.Reader = os.Stdin
+	name := "stdin"
+	if src != "-" {
+		f, err := os.Open(src)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		in, name = f, src
+	}
+
+	rep, err := scopeimport.Parse(in)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(os.Stderr, rep.Summary())
+	if len(rep.In) == 0 {
+		return fmt.Errorf("в скоупе нет ни одной цели — проверьте входной текст")
+	}
+
+	if program == "" {
+		if roots := rep.Scope("", "").RootDomains(); len(roots) > 0 {
+			program = roots[0]
+		}
+	}
+	out, err := scopeimport.RenderYAML(rep.Scope(program, platform), name)
+	if err != nil {
+		return err
+	}
+
+	if dst == "" {
+		_, err = os.Stdout.Write(out)
+		return err
+	}
+	if !yes {
+		// Спросить можно, только если stdin — терминал и скоуп пришёл не из него.
+		if src == "-" || !stdinIsTerminal() {
+			return fmt.Errorf("запись в %s требует подтверждения: добавьте -yes", dst)
+		}
+		fmt.Fprintf(os.Stderr, "Записать скоуп в %s? [y/N] ", dst)
+		ans, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		if a := strings.ToLower(strings.TrimSpace(ans)); a != "y" && a != "yes" && a != "д" && a != "да" {
+			return fmt.Errorf("отменено, файл не записан")
+		}
+	}
+	if err := os.WriteFile(dst, out, 0o644); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "Скоуп записан в %s\n", dst)
+	return nil
+}
+
+// stdinIsTerminal — грубая проверка без внешних зависимостей: символьное
+// устройство, но не /dev/null (он тоже символьное устройство).
+func stdinIsTerminal() bool {
+	st, err := os.Stdin.Stat()
+	if err != nil || st.Mode()&os.ModeCharDevice == 0 {
+		return false
+	}
+	if null, err := os.Stat(os.DevNull); err == nil && os.SameFile(st, null) {
+		return false
+	}
+	return true
 }
 
 // loadCWE читает каталог, проверяет его и загружает в граф.
