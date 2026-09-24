@@ -85,28 +85,42 @@ func (s *Store) UpsertProgram(ctx context.Context, name, platform string) error 
 	})
 }
 
+// StartRun записывает узел прогона (:Run) и привязывает его к программе.
+// run_id этого прогона проставляется на всех активах, найденных в нём.
+func (s *Store) StartRun(ctx context.Context, runID, program, profile string) error {
+	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
+		_, err := tx.Run(ctx, `
+			MERGE (p:Program {name: $program})
+			MERGE (r:Run {id: $run})
+			SET r.profile = $profile, r.started_at = timestamp()
+			MERGE (p)-[:HAS_RUN]->(r)
+		`, map[string]any{"run": runID, "program": program, "profile": profile})
+		return err
+	})
+}
+
 // AddSubdomain записывает найденный поддомен и привязывает его к домену.
-func (s *Store) AddSubdomain(ctx context.Context, parentDomain, subdomain, source string) error {
+func (s *Store) AddSubdomain(ctx context.Context, parentDomain, subdomain, source, runID string) error {
 	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
 		_, err := tx.Run(ctx, `
 			MERGE (d:Domain {name: $parent})
 			MERGE (s:Subdomain {name: $sub})
-			SET s.source = $source, s.discovered_at = timestamp()
+			SET s.source = $source, s.discovered_at = timestamp(), s.run_id = $run
 			MERGE (d)-[:HAS_SUBDOMAIN]->(s)
-		`, map[string]any{"parent": parentDomain, "sub": subdomain, "source": source})
+		`, map[string]any{"parent": parentDomain, "sub": subdomain, "source": source, "run": runID})
 		return err
 	})
 }
 
 // AddResolution связывает поддомен с IP-адресом (Subdomain-[:RESOLVES_TO]->IP).
-func (s *Store) AddResolution(ctx context.Context, subdomain, ip string) error {
+func (s *Store) AddResolution(ctx context.Context, subdomain, ip, runID string) error {
 	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
 		_, err := tx.Run(ctx, `
 			MERGE (s:Subdomain {name: $sub})
 			MERGE (i:IP {addr: $ip})
-			SET i.discovered_at = coalesce(i.discovered_at, timestamp())
+			SET i.discovered_at = coalesce(i.discovered_at, timestamp()), i.run_id = $run
 			MERGE (s)-[:RESOLVES_TO]->(i)
-		`, map[string]any{"sub": subdomain, "ip": ip})
+		`, map[string]any{"sub": subdomain, "ip": ip, "run": runID})
 		return err
 	})
 }
@@ -122,7 +136,7 @@ type HTTPService struct {
 }
 
 // AddHTTPService записывает результат HTTP-проба на узел Subdomain.
-func (s *Store) AddHTTPService(ctx context.Context, svc HTTPService) error {
+func (s *Store) AddHTTPService(ctx context.Context, svc HTTPService, runID string) error {
 	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
 		_, err := tx.Run(ctx, `
 			MERGE (s:Subdomain {name: $host})
@@ -131,7 +145,8 @@ func (s *Store) AddHTTPService(ctx context.Context, svc HTTPService) error {
 			    svc.title = $title,
 			    svc.webserver = $webserver,
 			    svc.tech = $tech,
-			    svc.probed_at = timestamp()
+			    svc.probed_at = timestamp(),
+			    svc.run_id = $run
 			MERGE (s)-[:RUNS]->(svc)
 		`, map[string]any{
 			"host":      svc.Host,
@@ -140,24 +155,26 @@ func (s *Store) AddHTTPService(ctx context.Context, svc HTTPService) error {
 			"title":     svc.Title,
 			"webserver": svc.WebServer,
 			"tech":      svc.Tech,
+			"run":       runID,
 		})
 		return err
 	})
 }
 
 // AddPort записывает открытый порт на IP (IP-[:HAS_PORT]->Port).
-func (s *Store) AddPort(ctx context.Context, ip string, port int, proto, service string) error {
+func (s *Store) AddPort(ctx context.Context, ip string, port int, proto, service, runID string) error {
 	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
 		_, err := tx.Run(ctx, `
 			MERGE (i:IP {addr: $ip})
 			MERGE (p:Port {ip: $ip, number: $port, proto: $proto})
-			SET p.service = $service, p.discovered_at = timestamp()
+			SET p.service = $service, p.discovered_at = timestamp(), p.run_id = $run
 			MERGE (i)-[:HAS_PORT]->(p)
 		`, map[string]any{
 			"ip":      ip,
 			"port":    int64(port),
 			"proto":   proto,
 			"service": service,
+			"run":     runID,
 		})
 		return err
 	})

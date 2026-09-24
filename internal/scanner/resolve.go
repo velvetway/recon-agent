@@ -32,19 +32,19 @@ func (s *Scanner) ResolveDNS(ctx context.Context, host string) error {
 			s.log.Debug("IP вне скоупа, пропуск", "host", host, "ip", ip)
 			continue
 		}
-		if err := s.store.AddResolution(ctx, host, ip); err != nil {
+		if err := s.store.AddResolution(ctx, host, ip, s.runID); err != nil {
 			s.log.Error("запись резолва в граф", "host", host, "ip", ip, "err", err)
 			continue
 		}
 		if s.next != nil {
-			s.next.Enqueue(queue.Task{Kind: "port_scan", Target: ip})
+			s.next.Enqueue(queue.Task{Kind: queue.KindPortScan, Target: ip})
 		}
 		probeQueued = true
 	}
 
 	// HTTP-проб ставим один раз на хост (httpx сам переберёт схемы/порты).
 	if probeQueued && s.next != nil {
-		s.next.Enqueue(queue.Task{Kind: "http_probe", Target: host})
+		s.next.Enqueue(queue.Task{Kind: queue.KindHTTPProbe, Target: host})
 	}
 	s.log.Info("резолв завершён", "host", host, "ips", len(ips))
 	return nil

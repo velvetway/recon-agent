@@ -31,11 +31,11 @@ func TestCheckDomain(t *testing.T) {
 		{"standoff365.com", true},
 		{"api.standoff365.com", true},
 		{"deep.sub.standoff365.com", true},
-		{"STANDOFF365.COM", true},          // регистр не важен
-		{"blog.standoff365.com", false},    // явный out_of_scope
-		{"evil.com", false},                // вне скоупа
-		{"notstandoff365.com", false},      // не суффикс
-		{"standoff365.com.evil.com", false},// подмена суффикса
+		{"STANDOFF365.COM", true},           // регистр не важен
+		{"blog.standoff365.com", false},     // явный out_of_scope
+		{"evil.com", false},                 // вне скоупа
+		{"notstandoff365.com", false},       // не суффикс
+		{"standoff365.com.evil.com", false}, // подмена суффикса
 		{"", false},
 	}
 	for _, c := range cases {

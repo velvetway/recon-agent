@@ -68,7 +68,7 @@ func (s *Scanner) HTTPProbe(ctx context.Context, host string) error {
 			Title:      r.Title,
 			WebServer:  r.WebServer,
 			Tech:       r.Tech,
-		}); err != nil {
+		}, s.runID); err != nil {
 			s.log.Error("запись HTTP-сервиса в граф", "host", host, "err", err)
 			continue
 		}

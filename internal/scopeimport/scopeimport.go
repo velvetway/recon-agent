@@ -278,7 +278,9 @@ func validDomain(d string) bool {
 // Scope строит config.Scope из отчёта. program и platform задаёт вызывающий.
 // Ставит разумные значения rate limits, чтобы записанный файл был полным.
 func (rep *Report) Scope(program, platform string) *config.Scope {
-	s := &config.Scope{Program: program, Platform: platform}
+	// Профиль по умолчанию — самый безопасный; при необходимости поднимается
+	// вручную в готовом scope.yaml.
+	s := &config.Scope{Program: program, Platform: platform, Profile: config.ProfilePassive}
 	fill := func(entries []Entry) (domains, cidrs []string, hasWildcard bool) {
 		for _, e := range entries {
 			switch e.Kind {

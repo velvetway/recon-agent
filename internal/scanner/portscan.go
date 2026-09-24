@@ -57,7 +57,7 @@ func (s *Scanner) PortScan(ctx context.Context, ip string) error {
 			if p.State.State != "open" {
 				continue
 			}
-			if err := s.store.AddPort(ctx, ip, p.PortID, p.Protocol, p.Service.Name); err != nil {
+			if err := s.store.AddPort(ctx, ip, p.PortID, p.Protocol, p.Service.Name, s.runID); err != nil {
 				s.log.Error("запись порта в граф", "ip", ip, "port", p.PortID, "err", err)
 				continue
 			}

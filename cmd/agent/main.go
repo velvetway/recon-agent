@@ -20,6 +20,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/velvet1way/recon-agent/internal/config"
 	"github.com/velvet1way/recon-agent/internal/cwe"
@@ -111,6 +112,11 @@ func main() {
 		fatal(log, "запись программы в граф", err)
 	}
 
+	runID := newRunID()
+	if err := store.StartRun(ctx, runID, sc.Program, string(sc.Profile)); err != nil {
+		fatal(log, "запись прогона в граф", err)
+	}
+
 	// scan объявляем заранее: обработчик очереди ссылается на него,
 	// а сам scan создаётся после оркестратора (цикл зависимостей).
 	var scan *scanner.Scanner
@@ -118,13 +124,13 @@ func main() {
 	// Обработчик очереди диспетчеризует задачи по видам.
 	handler := func(ctx context.Context, t queue.Task) error {
 		switch t.Kind {
-		case "subdomain_enum":
+		case queue.KindSubdomainEnum:
 			return scan.SubdomainEnum(ctx, t.Target)
-		case "dns_resolve":
+		case queue.KindDNSResolve:
 			return scan.ResolveDNS(ctx, t.Target)
-		case "http_probe":
+		case queue.KindHTTPProbe:
 			return scan.HTTPProbe(ctx, t.Target)
-		case "port_scan":
+		case queue.KindPortScan:
 			return scan.PortScan(ctx, t.Target)
 		default:
 			return fmt.Errorf("неизвестный вид задачи: %s", t.Kind)
@@ -135,15 +141,24 @@ func main() {
 	q := queue.New(sc.RateLimits.MaxConcurrent, limiter, handler, log)
 	q.Start(ctx)
 
-	orch := orchestrator.New(guard, q, log)
-	scan = scanner.New(guard, store, orch, *outDir, log)
+	orch := orchestrator.New(guard, q, sc.Profile, log)
+	scan = scanner.New(guard, store, orch, *outDir, runID, log)
 	roots := sc.RootDomains()
-	log.Info("старт разведки", "program", sc.Program, "roots", roots)
+	log.Info("старт разведки", "program", sc.Program, "profile", sc.Profile, "run", runID, "roots", roots)
 	orch.SeedFromScope(ctx, roots)
 
-	<-ctx.Done()
-	log.Info("остановка, ждём завершения задач")
+	// Прогон завершается сам, когда очередь опустела; Ctrl+C прерывает досрочно.
+	if q.WaitIdle(ctx) {
+		log.Info("разведка завершена: очередь пуста", "run", runID)
+	} else {
+		log.Info("прервано, ждём завершения текущих задач", "run", runID)
+	}
 	q.Shutdown()
+}
+
+// newRunID — идентификатор прогона по времени старта в UTC.
+func newRunID() string {
+	return "run-" + time.Now().UTC().Format("20060102-150405")
 }
 
 // importScope разбирает скоуп из текста, показывает сводку в stderr и пишет

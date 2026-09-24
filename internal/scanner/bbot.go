@@ -31,16 +31,18 @@ type Scanner struct {
 	store  *graph.Store
 	next   Enqueuer
 	outDir string
+	runID  string
 	log    *slog.Logger
 }
 
-// New создаёт исполнитель.
-func New(guard *scope.Guard, store *graph.Store, next Enqueuer, outDir string, log *slog.Logger) *Scanner {
+// New создаёт исполнитель. runID помечает все активы, найденные в этом прогоне.
+func New(guard *scope.Guard, store *graph.Store, next Enqueuer, outDir, runID string, log *slog.Logger) *Scanner {
 	return &Scanner{
 		guard:  guard,
 		store:  store,
 		next:   next,
 		outDir: outDir,
+		runID:  runID,
 		log:    log,
 	}
 }
@@ -70,8 +72,8 @@ func (s *Scanner) SubdomainEnum(ctx context.Context, target string) error {
 		"-p", "subdomain-enum",
 		"-o", scanDir,
 		"-om", "json",
-		"-y",          // не спрашивать подтверждение
-		"--no-deps",   // не переустанавливать зависимости на каждом запуске
+		"-y",        // не спрашивать подтверждение
+		"--no-deps", // не переустанавливать зависимости на каждом запуске
 	}
 
 	cmd := exec.CommandContext(ctx, "bbot", args...)
@@ -107,14 +109,14 @@ func (s *Scanner) SubdomainEnum(ctx context.Context, target string) error {
 		if !s.guard.Allowed(sub) {
 			continue
 		}
-		if err := s.store.AddSubdomain(ctx, target, sub, ev.Module); err != nil {
+		if err := s.store.AddSubdomain(ctx, target, sub, ev.Module, s.runID); err != nil {
 			s.log.Error("запись поддомена в граф", "sub", sub, "err", err)
 			continue
 		}
 		found++
 		// Follow-up: резолвим найденный поддомен в IP.
 		if s.next != nil {
-			s.next.Enqueue(queue.Task{Kind: "dns_resolve", Target: sub})
+			s.next.Enqueue(queue.Task{Kind: queue.KindDNSResolve, Target: sub})
 		}
 	}
 

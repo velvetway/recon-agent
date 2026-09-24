@@ -12,28 +12,42 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/velvet1way/recon-agent/internal/config"
 	"github.com/velvet1way/recon-agent/internal/queue"
 	"github.com/velvet1way/recon-agent/internal/scope"
 )
 
-// Orchestrator ставит задачи разведки, соблюдая скоуп.
+// Orchestrator ставит задачи разведки, соблюдая скоуп и профиль программы.
 type Orchestrator struct {
-	guard *scope.Guard
-	queue *queue.Queue
-	log   *slog.Logger
-	seen  sync.Map // ключ kind|target -> struct{}, дедуп задач
+	guard   *scope.Guard
+	queue   *queue.Queue
+	profile config.Profile
+	log     *slog.Logger
+	seen    sync.Map // ключ kind|target -> struct{}, дедуп задач
 }
 
-// New создаёт оркестратор.
-func New(guard *scope.Guard, q *queue.Queue, log *slog.Logger) *Orchestrator {
-	return &Orchestrator{guard: guard, queue: q, log: log}
+// New создаёт оркестратор. profile — максимально допустимый уровень «шумности».
+func New(guard *scope.Guard, q *queue.Queue, profile config.Profile, log *slog.Logger) *Orchestrator {
+	return &Orchestrator{guard: guard, queue: q, profile: profile, log: log}
 }
 
-// Enqueue ставит задачу в очередь после проверки scope-guard и дедупликации.
-// Возвращает false, если цель заблокирована или задача уже ставилась.
+// Enqueue ставит задачу в очередь после трёх проверок: дедуп, профиль
+// программы, scope-guard. Возвращает false, если задача отклонена.
 func (o *Orchestrator) Enqueue(t queue.Task) bool {
 	key := t.Kind + "|" + t.Target
 	if _, dup := o.seen.LoadOrStore(key, struct{}{}); dup {
+		return false
+	}
+	// Профильная проверка: инструмент шумнее, чем разрешает программа, не
+	// ставится. Неизвестный вид задачи требует active и на passive не пройдёт.
+	need, known := queue.MinProfile(t.Kind)
+	if !known {
+		o.log.Warn("неизвестный вид задачи, требуется профиль active",
+			"kind", t.Kind, "target", t.Target)
+	}
+	if !o.profile.AtLeast(need) {
+		o.log.Info("задача пропущена: выше профиля программы",
+			"kind", t.Kind, "target", t.Target, "need", need, "profile", o.profile)
 		return false
 	}
 	if d := o.guard.Check(t.Target); !d.Allowed {
@@ -50,6 +64,6 @@ func (o *Orchestrator) Enqueue(t queue.Task) bool {
 // по каждому корневому домену из скоупа.
 func (o *Orchestrator) SeedFromScope(ctx context.Context, rootDomains []string) {
 	for _, d := range rootDomains {
-		o.Enqueue(queue.Task{Kind: "subdomain_enum", Target: d})
+		o.Enqueue(queue.Task{Kind: queue.KindSubdomainEnum, Target: d})
 	}
 }

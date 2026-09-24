@@ -9,10 +9,34 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Profile — уровень «шумности» разведки. Программа задаёт максимально
+// допустимый уровень; инструмент с более высоким требованием не запускается.
+//
+//	passive — только пассивный сбор, без обращений к целям (напр. OSINT-модули)
+//	light   — лёгкие прямые обращения (DNS-резолв, HTTP-проб)
+//	active  — активное сканирование (перебор портов, брутфорс путей)
+type Profile string
+
+const (
+	ProfilePassive Profile = "passive"
+	ProfileLight   Profile = "light"
+	ProfileActive  Profile = "active"
+)
+
+var profileRank = map[Profile]int{ProfilePassive: 0, ProfileLight: 1, ProfileActive: 2}
+
+// Valid сообщает, что профиль известен.
+func (p Profile) Valid() bool { _, ok := profileRank[p]; return ok }
+
+// AtLeast возвращает true, если p не ниже уровня need — то есть программа с
+// профилем p разрешает инструмент, которому нужен минимум need.
+func (p Profile) AtLeast(need Profile) bool { return profileRank[p] >= profileRank[need] }
+
 // Scope описывает границы программы bug bounty.
 type Scope struct {
-	Program  string `yaml:"program"`
-	Platform string `yaml:"platform"`
+	Program  string  `yaml:"program"`
+	Platform string  `yaml:"platform"`
+	Profile  Profile `yaml:"profile"`
 
 	InScope struct {
 		Domains   []string `yaml:"domains"`
@@ -30,9 +54,9 @@ type Scope struct {
 
 // RateLimits — ограничения скорости, чтобы не поймать бан на программе.
 type RateLimits struct {
-	GlobalRPS       int `yaml:"global_rps"`
-	PerTargetRPS    int `yaml:"per_target_rps"`
-	MaxConcurrent   int `yaml:"max_concurrent_scans"`
+	GlobalRPS     int `yaml:"global_rps"`
+	PerTargetRPS  int `yaml:"per_target_rps"`
+	MaxConcurrent int `yaml:"max_concurrent_scans"`
 }
 
 // RootDomains возвращает корневые домены из in_scope без wildcard-префикса,
@@ -68,6 +92,14 @@ func LoadScope(path string) (*Scope, error) {
 
 	if len(s.InScope.Domains) == 0 && len(s.InScope.CIDRs) == 0 {
 		return nil, fmt.Errorf("scope пуст: не задано ни одного in_scope домена или CIDR")
+	}
+
+	// Профиль по умолчанию — самый безопасный.
+	if s.Profile == "" {
+		s.Profile = ProfilePassive
+	}
+	if !s.Profile.Valid() {
+		return nil, fmt.Errorf("неизвестный profile %q: допустимо passive, light или active", s.Profile)
 	}
 
 	// Разумные значения по умолчанию.
