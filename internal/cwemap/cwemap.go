@@ -148,11 +148,33 @@ func New(rules []Rule, cat *cwe.Catalog) (*Engine, error) {
 // Len — число загруженных правил.
 func (e *Engine) Len() int { return len(e.rules) }
 
+// nativeCWEConfidence — уверенность для CWE, которые инструмент (nuclei)
+// классифицировал сам: выше эвристик, но не 1 — шаблон мог сработать неточно.
+const nativeCWEConfidence = 0.8
+
+// nativeCWEKind — вид наблюдения, где value уже содержит CWE-ID, проставленный
+// самим инструментом (nuclei classification).
+const nativeCWEKind = "finding_cwe"
+
 // Match прогоняет наблюдения через правила и возвращает кандидатов,
 // отсортированных детерминированно: по активу, затем по убыванию уверенности.
+// Наблюдения kind="finding_cwe" (готовая классификация nuclei) проходят
+// напрямую через CWE-guard, минуя правила.
 func (e *Engine) Match(obs []graph.Observation) []Finding {
 	var out []Finding
 	for _, o := range obs {
+		if o.Kind == nativeCWEKind {
+			if id, ok := e.cat.Normalize(o.Value); ok {
+				w, _ := e.cat.Get(id)
+				out = append(out, Finding{
+					Asset: o.Asset, CWE: id, CWETitle: w.Title(),
+					Confidence: nativeCWEConfidence, RuleID: "nuclei", Title: "Классификация nuclei",
+					Vector: "Подтверждено шаблоном nuclei: " + o.Evidence, EvidenceID: o.ID,
+					Signal: o.Kind + "=" + o.Value,
+				})
+			}
+			continue
+		}
 		for _, r := range e.rules {
 			if !r.matches(o) {
 				continue

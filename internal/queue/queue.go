@@ -11,7 +11,8 @@ import (
 // Task — единица работы разведки.
 type Task struct {
 	Kind   string // напр. "subdomain_enum", "port_scan"
-	Target string // домен или IP
+	Target string // домен или IP — по нему проверяет scope-guard
+	URL    string // необязательный полный URL (со схемой) для HTTP-инструментов
 }
 
 // Handler выполняет задачу. Реализуется исполнителем (scanner).

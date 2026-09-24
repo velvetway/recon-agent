@@ -60,10 +60,12 @@ func (o *Orchestrator) Enqueue(t queue.Task) bool {
 	return true
 }
 
-// SeedFromScope ставит стартовые задачи перечисления поддоменов
-// по каждому корневому домену из скоупа.
+// SeedFromScope ставит стартовые задачи по каждому корневому домену: пассивный
+// сбор поддоменов (bbot) и URL из архивов (gau). Профильный гейт сам отсеет то,
+// что выше профиля программы.
 func (o *Orchestrator) SeedFromScope(ctx context.Context, rootDomains []string) {
 	for _, d := range rootDomains {
 		o.Enqueue(queue.Task{Kind: queue.KindSubdomainEnum, Target: d})
+		o.Enqueue(queue.Task{Kind: queue.KindPassiveURLs, Target: d})
 	}
 }

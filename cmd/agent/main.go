@@ -153,12 +153,18 @@ func main() {
 		switch t.Kind {
 		case queue.KindSubdomainEnum:
 			return scan.SubdomainEnum(ctx, t.Target)
+		case queue.KindPassiveURLs:
+			return scan.PassiveURLs(ctx, t.Target)
 		case queue.KindDNSResolve:
 			return scan.ResolveDNS(ctx, t.Target)
 		case queue.KindHTTPProbe:
 			return scan.HTTPProbe(ctx, t.Target)
+		case queue.KindCrawl:
+			return scan.Crawl(ctx, t)
 		case queue.KindPortScan:
 			return scan.PortScan(ctx, t.Target)
+		case queue.KindVulnScan:
+			return scan.VulnScan(ctx, t)
 		default:
 			return fmt.Errorf("неизвестный вид задачи: %s", t.Kind)
 		}

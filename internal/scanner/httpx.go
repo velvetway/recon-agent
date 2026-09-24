@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/velvet1way/recon-agent/internal/graph"
+	"github.com/velvet1way/recon-agent/internal/queue"
 )
 
 // httpxResult — подмножество JSONL-вывода httpx (projectdiscovery).
@@ -74,6 +75,13 @@ func (s *Scanner) HTTPProbe(ctx context.Context, host string) error {
 		}
 		for _, tech := range r.Tech {
 			s.observe(ctx, host, "httpx", "tech", tech, r.URL)
+		}
+		// Follow-up на живой сервис: краулинг (katana) и шаблонный скан
+		// (nuclei). URL несём отдельно — scope-guard проверяет host в Target.
+		// Профильный гейт отсечёт то, что выше профиля программы.
+		if s.next != nil {
+			s.next.Enqueue(queue.Task{Kind: queue.KindCrawl, Target: host, URL: r.URL})
+			s.next.Enqueue(queue.Task{Kind: queue.KindVulnScan, Target: host, URL: r.URL})
 		}
 		found++
 	}

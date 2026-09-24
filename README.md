@@ -77,10 +77,21 @@ make run
 Задачи связаны в цепочку, каждый этап ставит следующий через scope-guard:
 
 ```
-subdomain_enum (bbot)  ──▶  dns_resolve (Go net)  ──┬─▶  http_probe (httpx)
-   Domain→Subdomain          Subdomain→IP           └─▶  port_scan (nmap)
-                                                          IP→Port→Service
+passive_urls (gau) ─ URL из архивов
+subdomain_enum (bbot) ─▶ dns_resolve (Go) ─▶ http_probe (httpx) ─┬─▶ crawl (katana)
+   Domain→Subdomain        Subdomain→IP        живой сервис       ├─▶ vuln_scan (nuclei) → CWE/CVE
+                                               └─▶ port_scan (nmap) IP→Port
 ```
+
+Инструменты — внешние: агент вызывает установленные у вас `gau`, `bbot`,
+`httpx`, `katana`, `nuclei`, `nmap` как подпроцессы. nuclei классифицирует
+находки сам (CWE/CVE в выводе) — они проходят в список `-map` напрямую с
+высокой уверенностью, минуя эвристические правила.
+
+Каждый инструмент объявляет минимальный профиль: `passive` (gau, bbot),
+`light` (dns, httpx, katana), `active` (nmap, nuclei). На программе с профилем
+`light` активный скан не запустится. HTTP-инструменты (httpx, katana, nuclei)
+получают обязательные заголовки и лимит `per_target_rps`.
 
 Оркестратор дедуплицирует задачи (один IP не сканируется дважды) и не ставит
 задачу шумнее, чем разрешает `profile` программы: на `passive` пройдёт только
@@ -104,6 +115,7 @@ subdomain_enum (bbot)  ──▶  dns_resolve (Go net)  ──┬─▶  http_pr
 - [x] наблюдения `(:Observation)` и экспорт архива прогона из графа
 - [x] фильтр шума (дедуп, парковки, CDN, лимиты) и санитайзер секретов
 - [x] правила «сигнал → CWE» с CWE-guard: первый список «актив → CWE»
+- [x] интеграция инструментов: gau, katana, nuclei (CWE/CVE из nuclei в `-map`)
 - [ ] MCP-сервер для LLM
 - [ ] Finding-узлы и приоритизация
 

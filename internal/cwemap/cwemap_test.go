@@ -105,6 +105,27 @@ func TestCWENormalizedInFinding(t *testing.T) {
 	}
 }
 
+// Находки nuclei (kind=finding_cwe) проходят напрямую через CWE-guard,
+// минуя правила, с высокой уверенностью.
+func TestNativeCWEPassthrough(t *testing.T) {
+	cat := testCat(t)
+	e, _ := New([]Rule{{ID: "unused", When: Condition{Kind: "tech"}, CWE: "200"}}, cat)
+	in := []graph.Observation{
+		obs("h", "nuclei", "finding_cwe", "CWE-319", "cve-template | high"),
+		obs("h", "nuclei", "finding_cwe", "CWE-99999", "не в каталоге"), // отсекается CWE-guard
+	}
+	got := e.Match(in)
+	if len(got) != 1 {
+		t.Fatalf("findings = %d, want 1 (несуществующий CWE должен отсеяться): %+v", len(got), got)
+	}
+	if got[0].CWE != "319" || got[0].RuleID != "nuclei" || got[0].Confidence != nativeCWEConfidence {
+		t.Errorf("finding = %+v", got[0])
+	}
+	if !strings.Contains(got[0].Vector, "nuclei") {
+		t.Errorf("вектор должен упоминать nuclei: %q", got[0].Vector)
+	}
+}
+
 // Настоящий словарь правил должен грузиться и проходить CWE-guard по
 // настоящему каталогу — защита от опечаток в ID.
 func TestRealRulesAgainstCatalog(t *testing.T) {
