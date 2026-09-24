@@ -1,4 +1,4 @@
-.PHONY: build test tidy neo4j-up neo4j-down run check
+.PHONY: build test tidy neo4j-up neo4j-down run check cwe-extract cwe-atlas cwe-load
 
 build:
 	go build -o bin/agent ./cmd/agent
@@ -22,3 +22,16 @@ run: build
 # make check TARGET=api.standoff365.com
 check: build
 	./bin/agent -scope $(or $(SCOPE),configs/scope.yaml) -check $(TARGET)
+
+# Каталог CWE (см. docs/PLAN.md, фаза 0).
+# make cwe-extract CWE_XML=cwec_v4.14.xml   — пересобрать data/cwe/cwe.json из XML MITRE
+cwe-extract:
+	python3 tools/cwe/extract.py --xml $(CWE_XML)
+
+# make cwe-atlas  — HTML-атлас в build/cwe_atlas.html
+cwe-atlas:
+	python3 tools/cwe/atlas.py
+
+# make cwe-load   — загрузить каталог в Neo4j
+cwe-load: build
+	./bin/agent -cwe-load data/cwe/cwe.json

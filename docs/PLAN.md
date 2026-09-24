@@ -41,12 +41,12 @@ Neo4j — единый источник правды
 
 ## Фаза 0. Каталог CWE в репозитории и в графе
 
-- [ ] 0.1 `tools/cwe/extract.py`: официальный XML MITRE + русский перевод →
+- [x] 0.1 `tools/cwe/extract.py`: официальный XML MITRE + русский перевод →
       `data/cwe/cwe.json`
-- [ ] 0.2 `tools/cwe/atlas.py`: сборка HTML-атласа из `cwe.json`
-- [ ] 0.3 `internal/cwe`: загрузка каталога в память (поиск по ID, родители,
+- [x] 0.2 `tools/cwe/atlas.py`: сборка HTML-атласа из `cwe.json`
+- [x] 0.3 `internal/cwe`: загрузка каталога в память (поиск по ID, родители,
       проверка существования для CWE-guard)
-- [ ] 0.4 `agent -cwe-load`: загрузка каталога в Neo4j, узлы `(:CWE)` и рёбра
+- [x] 0.4 `agent -cwe-load`: загрузка каталога в Neo4j, узлы `(:CWE)` и рёбра
       `(:CWE)-[:CHILD_OF]->(:CWE)`
 
 ## Фаза 1. Приём скоупа

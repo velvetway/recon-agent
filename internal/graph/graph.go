@@ -8,6 +8,10 @@
 //	(IP)-[:HAS_PORT]->(Port)
 //	(Port)-[:RUNS]->(Service)
 //	(Service)-[:HAS_FINDING]->(Finding)
+//
+// Каталог слабостей (справочник, не зависит от программы):
+//
+//	(CWE)-[:CHILD_OF]->(CWE)
 package graph
 
 import (
@@ -58,6 +62,7 @@ func (s *Store) InitSchema(ctx context.Context) error {
 		"CREATE CONSTRAINT ip_addr IF NOT EXISTS FOR (i:IP) REQUIRE i.addr IS UNIQUE",
 		"CREATE CONSTRAINT service_url IF NOT EXISTS FOR (s:Service) REQUIRE s.url IS UNIQUE",
 		"CREATE CONSTRAINT port_key IF NOT EXISTS FOR (p:Port) REQUIRE (p.ip, p.number, p.proto) IS UNIQUE",
+		"CREATE CONSTRAINT cwe_id IF NOT EXISTS FOR (c:CWE) REQUIRE c.id IS UNIQUE",
 	}
 	return s.write(ctx, func(tx neo4j.ManagedTransaction) error {
 		for _, c := range constraints {

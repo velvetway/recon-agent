@@ -1,0 +1,576 @@
+<title>CWE Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@400;600;700&display=swap">
+<style>
+:root{
+  --ground:#EBEEF1; --surface:#FFFFFF; --surface-2:#F4F6F8; --rule:#D6DCE2; --rule-soft:#E4E8EC;
+  --ink:#0F1620; --ink-2:#48535F; --ink-3:#7B8591;
+  --r-pillar:#0F1620; --r-pillar-ink:#FFFFFF;
+  --r-class:#2F5FD0; --r-base:#0E8A7A; --r-variant:#D08A1E; --r-compound:#B04A8C;
+  --hot:#C8342B; --hot-soft:#FBE9E7;
+  --sel:#E3E9F2; --focus:#2F5FD0;
+  --shadow:0 1px 0 rgba(15,22,32,.04),0 12px 32px -12px rgba(15,22,32,.14);
+  --f-display:"Unbounded","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0B0F16; --surface:#121822; --surface-2:#18202C; --rule:#27313F; --rule-soft:#1E2733;
+  --ink:#E7ECF2; --ink-2:#A3AEBB; --ink-3:#6E7A89;
+  --r-pillar:#E7ECF2; --r-pillar-ink:#0B0F16;
+  --r-class:#5A80E6; --r-base:#1A9E8C; --r-variant:#C08424; --r-compound:#C05E9E;
+  --hot:#F0675C; --hot-soft:#3A1A18;
+  --sel:#1F2A3A; --focus:#7D9CF0;
+  --shadow:0 1px 0 rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.6);
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --ground:#0B0F16; --surface:#121822; --surface-2:#18202C; --rule:#27313F; --rule-soft:#1E2733;
+  --ink:#E7ECF2; --ink-2:#A3AEBB; --ink-3:#6E7A89;
+  --r-pillar:#E7ECF2; --r-pillar-ink:#0B0F16;
+  --r-class:#5A80E6; --r-base:#1A9E8C; --r-variant:#C08424; --r-compound:#C05E9E;
+  --hot:#F0675C; --hot-soft:#3A1A18;
+  --sel:#1F2A3A; --focus:#7D9CF0;
+  --shadow:0 1px 0 rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.6);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--ground);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.mono{font-family:var(--f-mono);font-feature-settings:"zero" 1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---------- top bar ---------- */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in oklab,var(--ground) 88%,transparent);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+.bar-in{display:flex;align-items:center;gap:14px;padding-block:10px;padding-inline:16px;max-width:1440px;margin:0 auto}
+.logo{font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.06em;text-decoration:none;
+  display:flex;align-items:center;gap:9px;white-space:nowrap}
+.logo i{display:inline-grid;grid-template-columns:repeat(2,6px);gap:2px}
+.logo i b{width:6px;height:6px;border-radius:1.5px;display:block}
+.navbtn{display:none;border:1px solid var(--rule);background:var(--surface);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer}
+.search{position:relative;flex:1;max-width:560px;margin-left:auto}
+.search input{width:100%;height:38px;border-radius:10px;border:1px solid var(--rule);background:var(--surface);
+  color:var(--ink);padding:0 12px 0 36px;font:inherit;font-size:14px}
+.search input:focus{outline:2px solid var(--focus);outline-offset:0;border-color:transparent}
+.search svg{position:absolute;left:11px;top:11px;width:16px;height:16px;color:var(--ink-3)}
+.results{position:absolute;left:0;right:0;top:44px;background:var(--surface);border:1px solid var(--rule);border-radius:12px;
+  box-shadow:var(--shadow);max-height:min(70vh,520px);overflow:auto;padding:6px}
+.res{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;padding:8px 10px;border-radius:8px;cursor:pointer;text-decoration:none}
+.res[aria-selected="true"],.res:hover{background:var(--sel)}
+.res .id{grid-row:span 2;font-size:12px;font-weight:500;padding-top:2px;min-width:78px}
+.res .ru{font-weight:500;font-size:14px}
+.res .en{font-size:12.5px;color:var(--ink-3)}
+.res-empty{padding:14px;color:var(--ink-3);font-size:14px}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:340px minmax(0,1fr);max-width:1440px;margin:0 auto;min-height:calc(100% - 59px)}
+.side{border-right:1px solid var(--rule);position:sticky;top:59px;height:calc(100vh - 59px);display:flex;flex-direction:column;background:var(--ground)}
+.side-hd{padding:14px 16px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--rule-soft)}
+.side-t{font-family:var(--f-display);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--rule);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;color:var(--ink-2)}
+.chip[aria-pressed="true"]{border-color:var(--ink);color:var(--ink);background:var(--sel)}
+.chip .sw{width:9px;height:9px;border-radius:2px}
+.chip.hot[aria-pressed="true"]{border-color:var(--hot);background:var(--hot-soft);color:var(--hot)}
+.tree{overflow:auto;padding:6px 8px 40px;flex:1;font-size:13.5px}
+.tn{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:7px;cursor:pointer;text-decoration:none;min-width:0}
+.tn:hover{background:var(--surface-2)}
+.tn.cur{background:var(--sel);box-shadow:inset 2px 0 0 var(--ink)}
+.tw{flex:none;width:18px;height:18px;display:grid;place-items:center;border-radius:4px;color:var(--ink-3);font-size:9px;border:0;background:none;cursor:pointer;padding:0}
+.tw:hover{background:var(--rule-soft)}
+.tw[data-open="1"] span{transform:rotate(90deg)}
+.tw span{display:inline-block;transition:transform .15s}
+.tw.leaf{visibility:hidden}
+.tid{flex:none;font-size:11.5px;color:var(--ink-2);min-width:62px}
+.tnm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kids{margin-left:14px;border-left:1px solid var(--rule-soft);padding-left:2px}
+.dot{flex:none;width:7px;height:7px;border-radius:2px}
+.t25{flex:none;font-family:var(--f-mono);font-size:9.5px;font-weight:500;color:var(--hot);border:1px solid var(--hot);border-radius:4px;padding:0 4px;line-height:15px}
+mark{background:transparent;color:inherit;box-shadow:inset 0 -.45em 0 color-mix(in oklab,var(--r-class) 30%,transparent)}
+
+.main{min-width:0;padding-inline:clamp(16px,4vw,56px);padding-block:32px 80px}
+
+/* ---------- rank tokens ---------- */
+[data-r="Pillar"]{--rc:var(--r-pillar)} [data-r="Class"]{--rc:var(--r-class)} [data-r="Base"]{--rc:var(--r-base)}
+[data-r="Variant"]{--rc:var(--r-variant)} [data-r="Compound"]{--rc:var(--r-compound)}
+.dot{background:var(--rc)}
+.rank{display:inline-flex;align-items:center;gap:7px;font-family:var(--f-mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;
+  border:1px solid var(--rc);color:var(--ink);border-radius:6px;padding:3px 8px 3px 6px}
+.rank::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--rc)}
+
+/* ---------- home ---------- */
+.eyebrow{font-family:var(--f-mono);font-size:12px;color:var(--ink-3);letter-spacing:.04em}
+.h-title{font-family:var(--f-display);font-weight:700;font-size:clamp(34px,5.4vw,64px);line-height:1.02;letter-spacing:-.02em;margin:10px 0 16px;text-wrap:balance}
+.h-title em{font-style:normal;color:var(--ink-3)}
+.lede{max-width:64ch;color:var(--ink-2);font-size:16px;margin:0}
+.facts{display:flex;flex-wrap:wrap;gap:28px;margin:26px 0 8px}
+.fact b{display:block;font-family:var(--f-display);font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.fact span{font-size:12.5px;color:var(--ink-3)}
+.sec{margin-top:52px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--rule);padding-bottom:10px;margin-bottom:18px}
+.sec-h h2{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0;letter-spacing:-.005em}
+.sec-h p{margin:0;font-size:13px;color:var(--ink-3);max-width:60ch}
+
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink-2);margin-bottom:14px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px;background:var(--rc)}
+.spine{display:flex;flex-direction:column;gap:4px}
+.srow{display:grid;grid-template-columns:minmax(180px,300px) 1fr;gap:18px;align-items:center;padding:8px 10px;margin:0 -10px;border-radius:10px;text-decoration:none;cursor:pointer}
+.srow:hover{background:var(--surface)}
+.slab{min-width:0}
+.slab .mono{font-size:11.5px;color:var(--ink-3)}
+.slab div{font-weight:500;font-size:14px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.strack{display:flex;align-items:center;gap:10px;min-width:0}
+.sbar{display:flex;gap:2px;height:18px;min-width:6px}
+.seg{height:100%;background:var(--rc);min-width:2px}
+.seg:first-child{border-radius:4px 0 0 4px}.seg:last-child{border-radius:0 4px 4px 0}.seg:only-child{border-radius:4px}
+.seg:hover{filter:brightness(1.12)}
+.scount{font-family:var(--f-mono);font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tip{position:fixed;z-index:50;pointer-events:none;background:var(--surface);border:1px solid var(--rule);box-shadow:var(--shadow);
+  border-radius:8px;padding:8px 10px;font-size:12.5px;max-width:260px}
+.tip b{font-family:var(--f-mono);font-weight:500}
+.tblwrap{overflow-x:auto;margin-top:10px}
+details.tbl summary{cursor:pointer;font-size:13px;color:var(--ink-2);margin-top:14px}
+table{border-collapse:collapse;font-size:13px;width:100%;min-width:560px}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--rule-soft)}
+th{font-weight:500;color:var(--ink-3);font-size:12px}
+td.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.top25{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;counter-reset:t}
+.tc{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;background:var(--surface);border:1px solid var(--rule-soft);border-radius:12px;
+  padding:14px 16px;text-decoration:none;transition:border-color .15s,transform .15s}
+.tc:hover{border-color:var(--ink-3);transform:translateY(-1px)}
+.tc .rk{grid-row:span 3;font-family:var(--f-display);font-weight:600;font-size:26px;line-height:1;color:var(--ink-3);font-variant-numeric:tabular-nums;min-width:2ch}
+.tc .ci{font-family:var(--f-mono);font-size:12px;color:var(--hot)}
+.tc .cr{font-weight:500;font-size:14px;line-height:1.3}
+.tc .ce{font-size:12px;color:var(--ink-3);line-height:1.35}
+
+/* ---------- entry ---------- */
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;font-size:12.5px;color:var(--ink-3);margin-bottom:26px}
+.crumbs a{text-decoration:none;display:inline-flex;align-items:center;gap:6px;padding:3px 7px;border-radius:6px}
+.crumbs a:hover{background:var(--surface);color:var(--ink)}
+.crumbs .sep{opacity:.5}
+.e-head{display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+.e-id{font-family:var(--f-display);font-weight:700;font-size:clamp(52px,9vw,112px);line-height:.92;letter-spacing:-.04em;margin:0;
+  display:flex;align-items:baseline;gap:.08em;flex-wrap:wrap}
+.e-id small{font-size:.32em;letter-spacing:.02em;color:var(--ink-3);font-weight:400}
+.e-underline{height:6px;width:min(280px,50%);background:var(--rc);border-radius:3px;margin:16px 0 18px}
+.e-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:22px}
+.pill{font-size:12px;border:1px solid var(--rule);border-radius:6px;padding:3px 8px;color:var(--ink-2);background:var(--surface)}
+.pill.hot{border-color:var(--hot);color:var(--hot);background:var(--hot-soft);font-weight:500}
+.pill b{color:var(--ink);font-weight:500}
+.e-ru{font-family:var(--f-display);font-weight:600;font-size:clamp(22px,2.6vw,30px);line-height:1.2;letter-spacing:-.01em;margin:0 0 8px;text-wrap:balance;max-width:40ch}
+.e-en{font-size:15px;color:var(--ink-3);margin:0;max-width:70ch}
+.alt{margin-top:8px;font-size:13px;color:var(--ink-3)}
+
+.jump{position:sticky;top:59px;z-index:5;background:color-mix(in oklab,var(--ground) 92%,transparent);backdrop-filter:blur(8px);
+  display:flex;gap:4px;overflow-x:auto;padding:10px 0;margin:30px 0 6px;border-bottom:1px solid var(--rule)}
+.jump button{border:0;background:none;padding:6px 10px;border-radius:7px;font-size:13px;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.jump button:hover{background:var(--surface);color:var(--ink)}
+.jump button .c{font-family:var(--f-mono);font-size:11px;color:var(--ink-3);margin-left:5px}
+
+.block{margin-top:40px;scroll-margin-top:120px}
+.block>h3{font-family:var(--f-display);font-weight:600;font-size:17px;margin:0 0 4px;letter-spacing:-.005em}
+.block>.sub{font-size:13px;color:var(--ink-3);margin:0 0 16px;max-width:70ch}
+.bi{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--rule);border-radius:14px;overflow:hidden;background:var(--surface)}
+.bi>div{padding:18px 20px;min-width:0}
+.bi>div+div{border-left:1px solid var(--rule)}
+.lang{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;color:var(--ink-3);margin-bottom:8px;display:block}
+.bi p{margin:0;max-width:62ch}
+.bi .en-t{color:var(--ink-2)}
+details.more{margin-top:12px}
+details.more summary{cursor:pointer;font-size:13px;color:var(--ink-2)}
+details.more p{font-size:14px;color:var(--ink-2);max-width:78ch}
+
+.capec{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.capec a{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;
+  text-decoration:none;background:var(--surface);font-family:var(--f-mono);font-size:13px}
+.capec a:hover{border-color:var(--ink-3)}
+.capec a span{color:var(--ink-3);font-size:12px}
+.inh{font-size:13px;color:var(--ink-2);margin:0 0 12px}
+.inh a{font-family:var(--f-mono)}
+.none{font-size:14px;color:var(--ink-3);border:1px dashed var(--rule);border-radius:12px;padding:14px 16px}
+
+.list{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:14px;background:var(--surface);overflow:hidden}
+.li{padding:14px 18px;display:grid;gap:6px}
+.li+.li{border-top:1px solid var(--rule-soft)}
+.li-h{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.li-h strong{font-weight:600;font-size:14px}
+.li p{margin:0;font-size:13.5px;color:var(--ink-2);max-width:86ch}
+.eff{font-family:var(--f-mono);font-size:11px;border-radius:5px;padding:1px 6px;border:1px solid var(--rule);color:var(--ink-2)}
+.eff[data-e="High"]{border-color:var(--r-base);color:var(--r-base)}
+.eff[data-e="Limited"],.eff[data-e="Opportunistic"],.eff[data-e="Incidental"]{border-style:dashed}
+.phase{font-size:12px;color:var(--ink-3)}
+
+.cons{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.cc{border:1px solid var(--rule);border-radius:12px;background:var(--surface);padding:14px 16px}
+.cc .sc{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.cc .sc span{font-family:var(--f-mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink);background:var(--surface-2);border-radius:5px;padding:2px 7px}
+.cc ul{margin:0;padding-left:18px;font-size:14px}
+.cc ul li::marker{color:var(--ink-3)}
+.cc .nt{font-size:12.5px;color:var(--ink-3);margin:8px 0 0}
+
+.cve{display:flex;flex-direction:column;border:1px solid var(--rule);border-radius:14px;background:var(--surface);overflow:hidden}
+.cv{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:11px 16px;text-decoration:none;font-size:13.5px}
+.cv+.cv{border-top:1px solid var(--rule-soft)}
+.cv:hover{background:var(--surface-2)}
+.cv .mono{font-size:12.5px;font-weight:500}
+.cv span:last-child{color:var(--ink-2)}
+
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.kv h4{margin:0 0 8px;font-size:12px;font-weight:500;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:13px;border:1px solid var(--rule);border-radius:7px;padding:3px 9px;background:var(--surface)}
+.tag small{color:var(--ink-3);margin-left:4px}
+
+.rel{display:flex;flex-direction:column;gap:18px}
+.rel h4{margin:0 0 8px;font-size:12px;font-weight:500;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em}
+.rlinks{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.rl{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--surface);text-decoration:none;min-width:0}
+.rl:hover{border-color:var(--ink-3)}
+.rl .dot{margin-top:7px}
+.rl .mono{font-size:12px;color:var(--ink-2);display:block}
+.rl .nm{font-size:13.5px;line-height:1.35}
+
+.pn{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:56px}
+.pn a{border:1px solid var(--rule);border-radius:12px;padding:14px 16px;text-decoration:none;background:var(--surface);min-width:0}
+.pn a:hover{border-color:var(--ink-3)}
+.pn a.nx{text-align:right}
+.pn small{display:block;font-size:12px;color:var(--ink-3)}
+.pn span{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ext{display:flex;flex-wrap:wrap;gap:16px;margin-top:28px;font-size:13.5px}
+.ext a{color:var(--ink-2)}
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--rule);font-size:12.5px;color:var(--ink-3);max-width:80ch}
+
+.scrim{display:none}
+@media (max-width:1000px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .navbtn{display:inline-flex}
+  .side{position:fixed;left:0;top:0;bottom:0;width:min(360px,88vw);height:100%;z-index:60;transform:translateX(-102%);transition:transform .2s;
+    border-right:1px solid var(--rule);padding-top:env(safe-area-inset-top,0px);box-shadow:var(--shadow)}
+  body.nav .side{transform:none}
+  body.nav .scrim{display:block;position:fixed;inset:0;z-index:55;background:rgba(0,0,0,.35)}
+  .jump{top:59px}
+}
+@media (max-width:720px){
+  .logo span{display:none}
+  .bi{grid-template-columns:1fr}
+  .bi>div+div{border-left:0;border-top:1px solid var(--rule)}
+  .srow{grid-template-columns:1fr;gap:6px}
+  .cv{grid-template-columns:1fr;gap:2px}
+  .pn{grid-template-columns:1fr}
+  .pn a.nx{text-align:left}
+}
+</style>
+
+<header class="bar">
+  <div class="bar-in">
+    <button class="navbtn" id="navbtn" aria-label="Открыть каталог">Каталог</button>
+    <a class="logo" href="#home" aria-label="CWE Atlas, на главную"><i aria-hidden="true">
+      <b style="background:var(--r-class)"></b><b style="background:var(--r-base)"></b><b style="background:var(--r-variant)"></b><b style="background:var(--r-compound)"></b></i><span>CWE ATLAS</span></a>
+    <div class="search" role="search">
+      <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="CWE-79, «инъекция», deserialization…" autocomplete="off" spellcheck="false" aria-label="Поиск по каталогу CWE" aria-controls="results">
+      <div class="results" id="results" role="listbox" hidden></div>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="side" id="side" aria-label="Каталог CWE">
+    <div class="side-hd">
+      <div class="side-t"><span>Research Concepts · CWE-1000</span><span id="tcount"></span></div>
+      <div class="chips" id="fchips">
+        <button class="chip" data-f="Class" data-r="Class" aria-pressed="false"><span class="sw dot"></span>Класс</button>
+        <button class="chip" data-f="Base" data-r="Base" aria-pressed="false"><span class="sw dot"></span>Базовая</button>
+        <button class="chip" data-f="Variant" data-r="Variant" aria-pressed="false"><span class="sw dot"></span>Вариант</button>
+        <button class="chip" data-f="Compound" data-r="Compound" aria-pressed="false"><span class="sw dot"></span>Составная</button>
+        <button class="chip hot" data-f="t25" aria-pressed="false">Top 25</button>
+      </div>
+    </div>
+    <nav class="tree" id="tree"></nav>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <main class="main" id="main"></main>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>/*DATA*/</script>
+<script>
+(function(){
+"use strict";
+const EN=DATA.en, RU=DATA.ru;
+const TOP25=["787","79","89","416","78","20","125","22","352","434","862","476","287","190","502","77","119","798","918","306","362","269","94","863","276"];
+const RANKS=["Class","Base","Variant","Compound"];
+const L={
+ ab:{Pillar:"Столп",Class:"Класс",Base:"Базовая",Variant:"Вариант",Compound:"Составная"},
+ st:{Stable:"стабильная",Draft:"черновик",Incomplete:"неполная",Usable:"пригодная"},
+ lik:{High:"высокая",Medium:"средняя",Low:"низкая",Unknown:"неизвестна"},
+ scope:{"Access Control":"Контроль доступа",Accountability:"Подотчётность",Authentication:"Аутентификация",Authorization:"Авторизация",
+   Availability:"Доступность",Confidentiality:"Конфиденциальность",Integrity:"Целостность","Non-Repudiation":"Неотказуемость",Other:"Прочее"},
+ impact:{"Alter Execution Logic":"Изменение логики выполнения","Bypass Protection Mechanism":"Обход механизма защиты","DoS: Amplification":"DoS: усиление",
+   "DoS: Crash, Exit, or Restart":"DoS: падение, выход или перезапуск","DoS: Instability":"DoS: нестабильность",
+   "DoS: Resource Consumption (CPU)":"DoS: расход процессора","DoS: Resource Consumption (Memory)":"DoS: расход памяти",
+   "DoS: Resource Consumption (Other)":"DoS: расход прочих ресурсов","Execute Unauthorized Code or Commands":"Выполнение неавторизованного кода или команд",
+   "Gain Privileges or Assume Identity":"Повышение привилегий или выдача себя за другого","Hide Activities":"Сокрытие действий",
+   "Modify Application Data":"Изменение данных приложения","Modify Files or Directories":"Изменение файлов или каталогов","Modify Memory":"Изменение памяти",
+   Other:"Прочее","Quality Degradation":"Снижение качества","Read Application Data":"Чтение данных приложения","Read Files or Directories":"Чтение файлов или каталогов",
+   "Read Memory":"Чтение памяти","Reduce Maintainability":"Снижение сопровождаемости","Reduce Performance":"Снижение производительности",
+   "Reduce Reliability":"Снижение надёжности","Unexpected State":"Неожиданное состояние","Varies by Context":"Зависит от контекста"},
+ phase:{"Architecture and Design":"Архитектура и проектирование","Build and Compilation":"Сборка и компиляция",Bundling:"Комплектование",Distribution:"Распространение",
+   Documentation:"Документация",Implementation:"Реализация",Installation:"Установка",Integration:"Интеграция",Manufacturing:"Производство",Operation:"Эксплуатация",
+   "Patching and Maintenance":"Исправление и сопровождение",Policy:"Политика",Requirements:"Требования","System Configuration":"Конфигурация системы",Testing:"Тестирование"},
+ strat:{"Attack Surface Reduction":"Сокращение поверхности атаки","Compilation or Build Hardening":"Усиление сборки","Enforcement by Conversion":"Принудительное преобразование",
+   "Environment Hardening":"Усиление окружения",Firewall:"Межсетевой экран","Input Validation":"Проверка ввода","Language Selection":"Выбор языка",
+   "Libraries or Frameworks":"Библиотеки и фреймворки","Output Encoding":"Кодирование вывода",Parameterization:"Параметризация",Refactoring:"Рефакторинг",
+   "Resource Limitation":"Ограничение ресурсов","Sandbox or Jail":"Песочница","Separation of Privilege":"Разделение привилегий"},
+ eff:{"Defense in Depth":"эшелонированная","Discouraged Common Practice":"нерекомендуемая практика",High:"высокая",Incidental:"косвенная",Limited:"ограниченная",
+   Moderate:"умеренная",None:"нет",Opportunistic:"ситуативная","SOAR Partial":"частичная (SOAR)"},
+ method:{"Architecture or Design Review":"Ревью архитектуры","Automated Analysis":"Автоматический анализ","Automated Dynamic Analysis":"Автоматический динамический анализ",
+   "Automated Static Analysis":"Автоматический статический анализ","Automated Static Analysis - Binary or Bytecode":"Автоматический статический анализ бинарного кода",
+   "Automated Static Analysis - Source Code":"Автоматический статический анализ исходного кода","Black Box":"Чёрный ящик",
+   "Dynamic Analysis with Automated Results Interpretation":"Динамический анализ с автоматической интерпретацией",
+   "Dynamic Analysis with Manual Results Interpretation":"Динамический анализ с ручной интерпретацией","Formal Verification":"Формальная верификация",
+   Fuzzing:"Фаззинг","Manual Analysis":"Ручной анализ","Manual Dynamic Analysis":"Ручной динамический анализ","Manual Static Analysis":"Ручной статический анализ",
+   "Manual Static Analysis - Binary or Bytecode":"Ручной статический анализ бинарного кода","Manual Static Analysis - Source Code":"Ручной статический анализ исходного кода",
+   Other:"Прочее","Simulation / Emulation":"Симуляция / эмуляция","White Box":"Белый ящик"},
+ rel:{PeerOf:"Смежные слабости",CanPrecede:"Может привести к",CanFollow:"Может следовать за",CanAlsoBe:"Может также быть",Requires:"Требует",StartsWith:"Начинается с"},
+ plat:{Language:"язык",Technology:"технология",Operating_System:"ОС",Architecture:"архитектура"},
+ prev:{Often:"часто",Sometimes:"иногда",Rarely:"редко",Undetermined:"не определено"}
+};
+const tr=(m,k)=>(L[m]&&L[m][k])||k;
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const plural=(n,a,b,c)=>{const m10=n%10,m100=n%100;return m10===1&&m100!==11?a:(m10>=2&&m10<=4&&(m100<10||m100>=20)?b:c)};
+
+// ---------- index ----------
+const ids=Object.keys(EN).sort((a,b)=>a-b);
+const parents={}, kids={};
+ids.forEach(i=>{kids[i]=[];});
+ids.forEach(i=>{const p=(EN[i].rel.ChildOf||[]).filter(x=>EN[x]); parents[i]=p; if(p.length) kids[p[0]].push(i);});
+const order={Pillar:0,Class:1,Base:2,Variant:3,Compound:4};
+ids.forEach(i=>kids[i].sort((a,b)=>(order[EN[a].ab]-order[EN[b].ab])||(a-b)));
+const pillars=ids.filter(i=>EN[i].ab==="Pillar");
+const primaryParent=i=>parents[i][0];
+function lineage(i){const l=[];let p=primaryParent(i),g=0;while(p&&g++<30){l.unshift(p);p=primaryParent(p);}return l;}
+function capecOf(i){ if(EN[i].capec.length) return {list:EN[i].capec,from:null};
+  let p=primaryParent(i),g=0; while(p&&g++<30){ if(EN[p].capec.length) return {list:EN[p].capec,from:p}; p=primaryParent(p);} return {list:[],from:null}; }
+const reverse={}; // CanPrecede reversed etc. for completeness: who lists me as PeerOf
+ids.forEach(i=>{Object.entries(EN[i].rel).forEach(([k,v])=>{ if(k==="ChildOf")return; v.forEach(t=>{ if(!EN[t])return; (reverse[t]=reverse[t]||{}); (reverse[t][k]=reverse[t][k]||[]).push(i); }); });});
+const name=i=>RU[i]?RU[i].n:EN[i].n;
+
+// ---------- sidebar tree ----------
+const treeEl=document.getElementById("tree");
+const expanded=new Set(pillars);
+const filt=new Set(); let current=null;
+function selfMatch(i){
+  if(filt.has("t25")&&!EN[i].t25) return false;
+  const r=[...filt].filter(f=>f!=="t25");
+  if(r.length&&!r.includes(EN[i].ab)) return false;
+  return true;
+}
+function renderTree(){
+  const active=filt.size>0; let vis=null, force=null;
+  if(active){ vis=new Set(); force=new Set();
+    ids.forEach(i=>{ if(EN[i].ab!=="Pillar"&&selfMatch(i)){ vis.add(i); lineage(i).forEach(p=>{vis.add(p);force.add(p);}); } }); }
+  let h="", shown=0;
+  const walk=i=>{
+    if(vis&&!vis.has(i)) return; shown++;
+    const ks=kids[i].filter(k=>!vis||vis.has(k)); const open=(force&&force.has(i))||expanded.has(i);
+    h+='<div><a class="tn'+(current===i?' cur':'')+'" href="#cwe-'+i+'" data-r="'+EN[i].ab+'">'
+      +'<button class="tw'+(ks.length?'':' leaf')+'" data-tw="'+i+'" data-open="'+(open?1:0)+'" aria-label="'+(open?'Свернуть':'Развернуть')+'" tabindex="-1"><span>▶</span></button>'
+      +'<span class="dot"></span><span class="tid mono">CWE-'+i+'</span><span class="tnm">'+esc(name(i))+'</span>'
+      +(EN[i].t25?'<span class="t25">T25</span>':'')+'</a>';
+    if(ks.length&&open){ h+='<div class="kids">'; ks.forEach(walk); h+='</div>'; }
+    h+='</div>';
+  };
+  pillars.forEach(walk);
+  treeEl.innerHTML=h;
+  document.getElementById("tcount").textContent=active?shown+" из "+ids.length:ids.length+" CWE";
+}
+treeEl.addEventListener("click",e=>{
+  const t=e.target.closest("[data-tw]"); if(!t) { if(e.target.closest(".tn")) document.body.classList.remove("nav"); return; }
+  e.preventDefault(); e.stopPropagation(); const i=t.dataset.tw;
+  expanded.has(i)?expanded.delete(i):expanded.add(i); renderTree();
+});
+document.getElementById("fchips").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c) return; const f=c.dataset.f;
+  filt.has(f)?filt.delete(f):filt.add(f); c.setAttribute("aria-pressed",filt.has(f)); renderTree();
+});
+function revealInTree(i){ lineage(i).forEach(p=>expanded.add(p)); renderTree();
+  const el=treeEl.querySelector('.tn[href="#cwe-'+i+'"]'); if(el) el.scrollIntoView({block:"nearest"}); }
+
+// ---------- search ----------
+const qEl=document.getElementById("q"), resEl=document.getElementById("results");
+const hay=ids.map(i=>[i,("cwe-"+i+" "+EN[i].n+" "+(RU[i]?RU[i].n:"")+" "+EN[i].alt.join(" ")).toLowerCase()]);
+let hits=[], hi=0;
+function hl(t,q){ if(!q) return esc(t); const k=t.toLowerCase().indexOf(q); if(k<0) return esc(t);
+  return esc(t.slice(0,k))+"<mark>"+esc(t.slice(k,k+q.length))+"</mark>"+esc(t.slice(k+q.length)); }
+function search(){
+  const raw=qEl.value.trim().toLowerCase(); if(!raw){ resEl.hidden=true; return; }
+  const q=raw.replace(/^cwe[-\s]?/,""); const num=/^\d+$/.test(q);
+  const terms=raw.split(/\s+/);
+  hits=hay.filter(([i,s])=>num? i.startsWith(q) : terms.every(t=>s.includes(t))).map(([i])=>i);
+  hits.sort((a,b)=>{ if(num) return (a===q?-1:b===q?1:a-b);
+    const sa=name(a).toLowerCase().includes(raw)||EN[a].n.toLowerCase().includes(raw), sb=name(b).toLowerCase().includes(raw)||EN[b].n.toLowerCase().includes(raw);
+    return (sb-sa)||(order[EN[a].ab]-order[EN[b].ab])||(a-b); });
+  hits=hits.slice(0,14); hi=0;
+  resEl.innerHTML=hits.length? hits.map((i,k)=>'<a class="res" role="option" aria-selected="'+(k===0)+'" href="#cwe-'+i+'" data-r="'+EN[i].ab+'">'
+    +'<span class="id mono">CWE-'+i+'</span><span class="ru">'+hl(name(i),raw)+'</span><span class="en">'+hl(EN[i].n,raw)+'</span></a>').join("")
+    :'<div class="res-empty">Ничего не нашлось. Попробуйте номер (например, 918) или слово на английском.</div>';
+  resEl.hidden=false;
+}
+qEl.addEventListener("input",search);
+qEl.addEventListener("focus",()=>{ if(qEl.value) search(); });
+qEl.addEventListener("keydown",e=>{
+  if(resEl.hidden||!hits.length) return;
+  if(e.key==="ArrowDown"||e.key==="ArrowUp"){ e.preventDefault(); hi=(hi+(e.key==="ArrowDown"?1:-1)+hits.length)%hits.length;
+    [...resEl.children].forEach((c,k)=>c.setAttribute("aria-selected",k===hi)); resEl.children[hi].scrollIntoView({block:"nearest"}); }
+  else if(e.key==="Enter"){ e.preventDefault(); location.hash="cwe-"+hits[hi]; closeSearch(); }
+  else if(e.key==="Escape"){ closeSearch(); }
+});
+function closeSearch(){ resEl.hidden=true; qEl.blur(); }
+resEl.addEventListener("click",()=>{ resEl.hidden=true; });
+document.addEventListener("click",e=>{ if(!e.target.closest(".search")) resEl.hidden=true; });
+document.addEventListener("keydown",e=>{ if(e.key==="/"&&document.activeElement!==qEl&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){ e.preventDefault(); qEl.focus(); } });
+
+// ---------- mobile drawer ----------
+document.getElementById("navbtn").addEventListener("click",()=>document.body.classList.toggle("nav"));
+document.getElementById("scrim").addEventListener("click",()=>document.body.classList.remove("nav"));
+
+// ---------- tooltip ----------
+const tip=document.getElementById("tip");
+document.addEventListener("pointermove",e=>{
+  const s=e.target.closest("[data-tip]"); if(!s){ tip.hidden=true; return; }
+  tip.innerHTML=s.dataset.tip; tip.hidden=false;
+  const w=tip.offsetWidth, x=Math.min(e.clientX+14, innerWidth-w-8); tip.style.left=x+"px"; tip.style.top=(e.clientY+16)+"px";
+});
+
+// ---------- home ----------
+const mainEl=document.getElementById("main");
+function descStats(p){ const c={Class:0,Base:0,Variant:0,Compound:0}; let t=0;
+  const w=i=>kids[i].forEach(k=>{ c[EN[k].ab]=(c[EN[k].ab]||0)+1; t++; w(k); }); w(p); return {c,t}; }
+const pstats=Object.fromEntries(pillars.map(p=>[p,descStats(p)]));
+function home(){
+  const max=Math.max(...pillars.map(p=>pstats[p].t));
+  const sorted=[...pillars].sort((a,b)=>pstats[b].t-pstats[a].t);
+  let h='<div class="eyebrow">MITRE CWE v4.14 · представление 1000 · '+ids.length+' слабостей</div>'
+   +'<h1 class="h-title">Атлас слабостей <em>ПО и железа</em></h1>'
+   +'<p class="lede">Каждая запись CWE с описанием на русском и английском, последствиями, шаблонами атак CAPEC, методами обнаружения и реальными CVE. Здесь будут размечаться находки recon-агента.</p>'
+   +'<div class="facts"><div class="fact"><b>'+pillars.length+'</b><span>столпов иерархии</span></div>'
+   +'<div class="fact"><b>'+ids.length+'</b><span>слабостей в каталоге</span></div>'
+   +'<div class="fact"><b>'+ids.filter(i=>EN[i].capec.length).length+'</b><span>связаны с CAPEC</span></div>'
+   +'<div class="fact"><b>'+ids.filter(i=>EN[i].obs.length).length+'</b><span>с примерами CVE</span></div></div>';
+  h+='<section class="sec"><div class="sec-h"><h2>Десять столпов</h2><p>Каждая полоса показывает всех потомков столпа, разбитых по уровню абстракции. Нажмите на строку, чтобы открыть столп.</p></div>'
+   +'<div class="legend">'+RANKS.map(r=>'<span data-r="'+r+'"><i></i>'+L.ab[r]+'</span>').join("")+'</div><div class="spine">';
+  sorted.forEach(p=>{ const s=pstats[p];
+    h+='<a class="srow" href="#cwe-'+p+'"><div class="slab"><span class="mono">CWE-'+p+'</span><div>'+esc(name(p))+'</div></div>'
+      +'<div class="strack"><div class="sbar" style="width:'+(s.t/max*100*0.86).toFixed(2)+'%">'
+      +RANKS.filter(r=>s.c[r]).map(r=>'<span class="seg" data-r="'+r+'" style="flex:'+s.c[r]+'" data-tip="<b>CWE-'+p+'</b> · '+L.ab[r]+': '+s.c[r]+'"></span>').join("")
+      +'</div><span class="scount">'+s.t+'</span></div></a>'; });
+  h+='</div><details class="tbl"><summary>Таблица значений</summary><div class="tblwrap"><table><thead><tr><th>Столп</th>'
+   +RANKS.map(r=>'<th style="text-align:right">'+L.ab[r]+'</th>').join("")+'<th style="text-align:right">Всего</th></tr></thead><tbody>'
+   +sorted.map(p=>'<tr><td><span class="mono">CWE-'+p+'</span> '+esc(name(p))+'</td>'+RANKS.map(r=>'<td class="n">'+(pstats[p].c[r]||0)+'</td>').join("")+'<td class="n">'+pstats[p].t+'</td></tr>').join("")
+   +'</tbody></table></div></details></section>';
+  h+='<section class="sec"><div class="sec-h"><h2>CWE Top 25</h2><p>Рейтинг самых опасных слабостей MITRE (2023). Номер слева — место в рейтинге.</p></div><div class="top25">'
+   +TOP25.filter(i=>EN[i]).map((i,k)=>'<a class="tc" href="#cwe-'+i+'"><span class="rk">'+(k+1)+'</span><span class="ci">CWE-'+i+'</span>'
+     +'<span class="cr">'+esc(name(i))+'</span><span class="ce">'+esc(EN[i].n)+'</span></a>').join("")+'</div></section>';
+  h+=footer();
+  return h;
+}
+function footer(){ return '<footer>Данные: MITRE CWE, каталог cwec_v4.14, представление CWE-1000 Research Concepts. Русские названия и описания — перевод; при расхождениях верен английский оригинал. Шаблоны атак ведут на capec.mitre.org, примеры — на cve.org.</footer>'; }
+
+// ---------- entry ----------
+function relLink(i){ return '<a class="rl" href="#cwe-'+i+'" data-r="'+EN[i].ab+'"><span class="dot"></span><span><span class="mono">CWE-'+i+' · '+L.ab[EN[i].ab]+'</span><span class="nm">'+esc(name(i))+'</span></span></a>'; }
+function entry(i){
+  const e=EN[i], r=RU[i]||{n:e.n,d:e.d};
+  const lin=lineage(i);
+  let h='<nav class="crumbs" aria-label="Положение в иерархии"><a href="#home">Атлас</a>';
+  lin.forEach(p=>{ h+='<span class="sep">/</span><a href="#cwe-'+p+'" data-r="'+EN[p].ab+'"><span class="dot"></span>CWE-'+p+'</a>'; });
+  h+='</nav>';
+  h+='<header class="e-head" data-r="'+e.ab+'"><h1 class="e-id"><small>CWE-</small>'+i+'</h1><div class="e-underline"></div>'
+   +'<div class="e-meta"><span class="rank">'+L.ab[e.ab]+'</span>'
+   +(e.t25?'<span class="pill hot">Top 25 · №'+(TOP25.indexOf(i)+1)+'</span>':'')
+   +'<span class="pill">Статус: <b>'+tr("st",e.st)+'</b></span>'
+   +(e.lik?'<span class="pill">Вероятность эксплуатации: <b>'+tr("lik",e.lik)+'</b></span>':'')
+   +'</div><h2 class="e-ru">'+esc(r.n)+'</h2><p class="e-en">'+esc(e.n)+'</p>'
+   +(e.alt.length?'<div class="alt">Также известна как: '+e.alt.map(esc).join(", ")+'</div>':'')+'</header>';
+
+  const cp=capecOf(i);
+  const secs=[["desc","Описание",null],["vec","Векторы",cp.list.length+e.det.length],["cons","Последствия",e.cons.length],
+    ["cve","Примеры CVE",e.obs.length],["mit","Защита",e.mit.length],["ctx","Где возникает",e.modes.length+e.plat.length],
+    ["rel","Связи",kids[i].length+parents[i].length+Object.values(e.rel).flat().length-(e.rel.ChildOf||[]).length]];
+  h+='<div class="jump" role="navigation" aria-label="Разделы">'+secs.filter(s=>s[2]===null||s[2]>0)
+    .map(s=>'<button data-go="'+s[0]+'">'+s[1]+(s[2]?'<span class="c">'+s[2]+'</span>':'')+'</button>').join("")+'</div>';
+
+  h+='<section class="block" id="s-desc"><h3>Описание</h3><p class="sub">Русский перевод рядом с оригиналом MITRE.</p>'
+   +'<div class="bi"><div><span class="lang">RU</span><p>'+esc(r.d)+'</p></div><div><span class="lang">EN</span><p class="en-t">'+esc(e.d)+'</p></div></div>'
+   +(e.x?'<details class="more"><summary>Расширенное описание (EN)</summary><p>'+esc(e.x)+'</p></details>':'')+'</section>';
+
+  h+='<section class="block" id="s-vec"><h3>Векторы</h3><p class="sub">Шаблоны атак CAPEC, которые MITRE связывает с этой слабостью, и способы её обнаружения.</p>';
+  if(cp.list.length){
+    if(cp.from) h+='<p class="inh">У этой записи нет своих шаблонов CAPEC. Ниже шаблоны родителя <a href="#cwe-'+cp.from+'">CWE-'+cp.from+'</a>.</p>';
+    h+='<div class="capec">'+cp.list.map(c=>'<a href="https://capec.mitre.org/data/definitions/'+esc(c)+'.html" target="_blank" rel="noopener">CAPEC-'+esc(c)+'<span>↗</span></a>').join("")+'</div>';
+  } else h+='<div class="none">MITRE не указывает шаблоны атак ни для этой записи, ни для её родителей.</div>';
+  if(e.det.length){
+    h+='<h3 style="font-size:15px;margin:26px 0 10px">Методы обнаружения</h3><div class="list">'+e.det.map(d=>'<div class="li"><div class="li-h"><strong>'+esc(tr("method",d.m))+'</strong>'
+      +(d.ef?'<span class="eff" data-e="'+esc(d.ef)+'">эффективность: '+esc(tr("eff",d.ef))+'</span>':'')+'</div>'+(d.t?'<p>'+esc(d.t)+'</p>':'')+'</div>').join("")+'</div>';
+  }
+  h+='</section>';
+
+  if(e.cons.length){
+    h+='<section class="block" id="s-cons"><h3>Последствия</h3><p class="sub">Какие свойства безопасности затрагивает эксплуатация и что получает атакующий.</p><div class="cons">'
+     +e.cons.map(c=>'<div class="cc"><div class="sc">'+c.s.map(s=>'<span>'+esc(tr("scope",s))+'</span>').join("")+'</div>'
+       +'<ul>'+c.i.map(x=>'<li>'+esc(tr("impact",x))+'</li>').join("")+'</ul>'+(c.note?'<p class="nt">'+esc(c.note)+'</p>':'')+'</div>').join("")+'</div></section>';
+  }
+  if(e.obs.length){
+    h+='<section class="block" id="s-cve"><h3>Примеры CVE</h3><p class="sub">Реальные уязвимости, которые MITRE относит к этой слабости.</p><div class="cve">'
+     +e.obs.map(o=>'<a class="cv" href="https://www.cve.org/CVERecord?id='+encodeURIComponent(o.r)+'" target="_blank" rel="noopener"><span class="mono">'+esc(o.r)+' ↗</span><span>'+esc(o.t)+'</span></a>').join("")+'</div></section>';
+  }
+  if(e.mit.length){
+    h+='<section class="block" id="s-mit"><h3>Защита</h3><p class="sub">Меры из каталога MITRE: на каком этапе и какой стратегией. Текст мер на английском.</p><div class="list">'
+     +e.mit.map(m=>'<div class="li"><div class="li-h">'+(m.st?'<strong>'+esc(tr("strat",m.st))+'</strong>':'<strong>Мера</strong>')
+       +'<span class="phase">'+m.ph.map(p=>esc(tr("phase",p))).join(" · ")+'</span>'
+       +(m.ef?'<span class="eff" data-e="'+esc(m.ef)+'">эффективность: '+esc(tr("eff",m.ef))+'</span>':'')+'</div><p>'+esc(m.t)+'</p></div>').join("")+'</div></section>';
+  }
+  if(e.modes.length||e.plat.length){
+    h+='<section class="block" id="s-ctx"><h3>Где возникает</h3><div class="kv">';
+    if(e.modes.length) h+='<div><h4>Этапы внесения</h4><div class="tags">'+e.modes.map(m=>'<span class="tag">'+esc(tr("phase",m))+'</span>').join("")+'</div></div>';
+    if(e.plat.length) h+='<div><h4>Платформы</h4><div class="tags">'+e.plat.map(p=>'<span class="tag">'+esc(p.n.replace(/_/g," "))+'<small>'+esc(tr("plat",p.k))+(p.p?', '+esc(tr("prev",p.p)):'')+'</small></span>').join("")+'</div></div>';
+    h+='</div></section>';
+  }
+  h+='<section class="block" id="s-rel"><h3>Связи</h3><div class="rel">';
+  if(parents[i].length) h+='<div><h4>Родители</h4><div class="rlinks">'+parents[i].map(relLink).join("")+'</div></div>';
+  if(kids[i].length) h+='<div><h4>Потомки · '+kids[i].length+'</h4><div class="rlinks">'+kids[i].map(relLink).join("")+'</div></div>';
+  Object.entries(e.rel).forEach(([k,v])=>{ if(k==="ChildOf")return; const vv=v.filter(x=>EN[x]); if(vv.length) h+='<div><h4>'+esc(tr("rel",k))+'</h4><div class="rlinks">'+vv.map(relLink).join("")+'</div></div>'; });
+  if(reverse[i]&&reverse[i].CanPrecede) h+='<div><h4>Могут привести к этой</h4><div class="rlinks">'+reverse[i].CanPrecede.map(relLink).join("")+'</div></div>';
+  if(!parents[i].length&&!kids[i].length&&Object.keys(e.rel).length===0) h+='<div class="none">Связей в этом представлении нет.</div>';
+  h+='</div></section>';
+
+  const p=primaryParent(i), sib=p?kids[p]:pillars, k=sib.indexOf(i), pv=sib[k-1], nx=sib[k+1];
+  if(pv||nx){ h+='<nav class="pn" aria-label="Соседние записи">'
+    +(pv?'<a href="#cwe-'+pv+'"><small>← CWE-'+pv+'</small><span>'+esc(name(pv))+'</span></a>':'<span></span>')
+    +(nx?'<a class="nx" href="#cwe-'+nx+'"><small>CWE-'+nx+' →</small><span>'+esc(name(nx))+'</span></a>':'<span></span>')+'</nav>'; }
+  h+='<div class="ext"><a href="https://cwe.mitre.org/data/definitions/'+i+'.html" target="_blank" rel="noopener">Запись на cwe.mitre.org ↗</a></div>';
+  h+=footer();
+  return h;
+}
+mainEl.addEventListener("click",e=>{ const b=e.target.closest("[data-go]"); if(b){ const t=document.getElementById("s-"+b.dataset.go); if(t) t.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"}); } });
+
+// ---------- router ----------
+function route(){
+  const m=/^#cwe-(\d+)$/.exec(location.hash);
+  if(m&&EN[m[1]]){ current=m[1]; mainEl.innerHTML=entry(m[1]); document.title="CWE-"+m[1]+" · CWE Atlas"; revealInTree(m[1]); }
+  else { current=null; mainEl.innerHTML=home(); document.title="CWE Atlas"; renderTree(); }
+  window.scrollTo(0,0); tip.hidden=true;
+}
+addEventListener("hashchange",route);
+route();
+})();
+</script>

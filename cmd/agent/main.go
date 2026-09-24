@@ -4,6 +4,7 @@
 //
 //	agent -scope configs/scope.yaml            # запустить разведку
 //	agent -scope configs/scope.yaml -check host # проверить цель scope-guard'ом
+//	agent -cwe-load data/cwe/cwe.json           # загрузить каталог CWE в Neo4j
 package main
 
 import (
@@ -16,6 +17,7 @@ import (
 	"syscall"
 
 	"github.com/velvet1way/recon-agent/internal/config"
+	"github.com/velvet1way/recon-agent/internal/cwe"
 	"github.com/velvet1way/recon-agent/internal/graph"
 	"github.com/velvet1way/recon-agent/internal/orchestrator"
 	"github.com/velvet1way/recon-agent/internal/queue"
@@ -30,10 +32,25 @@ func main() {
 		outDir    = flag.String("out", "output", "директория для результатов сканов")
 		neo4jURI  = flag.String("neo4j", envOr("NEO4J_URI", "neo4j://localhost:7687"), "URI Neo4j")
 		neo4jUser = flag.String("neo4j-user", envOr("NEO4J_USER", "neo4j"), "пользователь Neo4j")
+		cweLoad   = flag.String("cwe-load", "", "загрузить каталог CWE (data/cwe/cwe.json) в Neo4j и выйти")
 	)
 	flag.Parse()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	neo4jCfg := graph.Config{
+		URI:      *neo4jURI,
+		Username: *neo4jUser,
+		Password: envOr("NEO4J_PASSWORD", "password"),
+	}
+
+	// Загрузка каталога CWE — справочник, скоуп для неё не нужен.
+	if *cweLoad != "" {
+		if err := loadCWE(log, neo4jCfg, *cweLoad); err != nil {
+			fatal(log, "загрузка каталога CWE", err)
+		}
+		return
+	}
 
 	sc, err := config.LoadScope(*scopePath)
 	if err != nil {
@@ -61,11 +78,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	store, err := graph.New(ctx, graph.Config{
-		URI:      *neo4jURI,
-		Username: *neo4jUser,
-		Password: envOr("NEO4J_PASSWORD", "password"),
-	})
+	store, err := graph.New(ctx, neo4jCfg)
 	if err != nil {
 		fatal(log, "подключение к neo4j", err)
 	}
@@ -111,6 +124,34 @@ func main() {
 	<-ctx.Done()
 	log.Info("остановка, ждём завершения задач")
 	q.Shutdown()
+}
+
+// loadCWE читает каталог, проверяет его и загружает в граф.
+func loadCWE(log *slog.Logger, cfg graph.Config, path string) error {
+	cat, err := cwe.Load(path)
+	if err != nil {
+		return err
+	}
+	log.Info("каталог CWE прочитан", "version", cat.Version, "records", cat.Len())
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	store, err := graph.New(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("подключение к neo4j: %w", err)
+	}
+	defer store.Close(ctx)
+
+	if err := store.InitSchema(ctx); err != nil {
+		return fmt.Errorf("инициализация схемы графа: %w", err)
+	}
+	st, err := store.LoadCWECatalog(ctx, cat)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("CWE v%s загружен в граф: %d узлов, %d рёбер CHILD_OF\n", cat.Version, st.Nodes, st.Edges)
+	return nil
 }
 
 func envOr(key, def string) string {

@@ -94,6 +94,29 @@ subdomain_enum (bbot)  ──▶  dns_resolve (Go net)  ──┬─▶  http_pr
 - [x] http-probe через httpx (status, title, webserver, tech)
 - [x] port scan через nmap (top-100, определение сервисов)
 - [x] оркестратор (seed из скоупа, цепочка follow-up задач)
+- [x] каталог CWE: `data/cwe/cwe.json` (938 слабостей, RU+EN), загрузка в граф, HTML-атлас
 - [ ] MCP-сервер для LLM
 - [ ] Finding-узлы и приоритизация
+
+Полный план развития — [docs/PLAN.md](docs/PLAN.md).
+
+## Каталог CWE
+
+Справочник слабостей MITRE CWE (представление CWE-1000 Research Concepts)
+с русским переводом названий и описаний. На него опираются правила
+«сигнал → CWE» и проверка ответов LLM: CWE-ID принимается, только если он есть
+в каталоге.
+
+```bash
+make cwe-load     # загрузить каталог в Neo4j: (:CWE)-[:CHILD_OF]->(:CWE)
+make cwe-atlas    # собрать HTML-атлас в build/cwe_atlas.html
+
+# пересобрать data/cwe/cwe.json из свежего XML MITRE
+# (https://cwe.mitre.org/data/xml/cwec_latest.xml.zip)
+make cwe-extract CWE_XML=cwec_latest.xml.zip
+```
+
+Перевод хранится отдельно в `data/cwe/cwe_ru.tsv` (`id<TAB>название<TAB>описание`),
+поэтому при обновлении каталога MITRE он подмешивается заново, а для новых
+записей экстрактор выводит список CWE без перевода.
 ```
