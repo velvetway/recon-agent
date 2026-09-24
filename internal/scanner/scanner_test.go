@@ -1,9 +1,32 @@
 package scanner
 
 import (
+	"context"
 	"encoding/xml"
+	"strings"
 	"testing"
+
+	"github.com/velvet1way/recon-agent/internal/config"
+	"github.com/velvet1way/recon-agent/internal/scope"
 )
+
+// TestPortScanRejectsNonIP проверяет, что port_scan не запустит nmap по
+// доменному имени (даже если оно в скоупе): цель обязана быть IP.
+func TestPortScanRejectsNonIP(t *testing.T) {
+	sc := &config.Scope{}
+	sc.InScope.Domains = []string{"*.example.com"}
+	sc.InScope.Wildcards = true
+	guard, err := scope.New(sc)
+	if err != nil {
+		t.Fatalf("scope.New: %v", err)
+	}
+	s := New(guard, nil, nil, "", nil)
+
+	err = s.PortScan(context.Background(), "api.example.com")
+	if err == nil || !strings.Contains(err.Error(), "IP-адрес") {
+		t.Fatalf("ожидался отказ port_scan по домену, получено: %v", err)
+	}
+}
 
 func TestStripScheme(t *testing.T) {
 	cases := map[string]string{

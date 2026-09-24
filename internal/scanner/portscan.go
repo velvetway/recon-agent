@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/xml"
 	"fmt"
+	"net"
 	"os/exec"
 )
 
@@ -28,6 +29,12 @@ type nmapRun struct {
 // PortScan запускает nmap по IP (top-100 портов, определение сервисов),
 // пишет открытые порты в граф как Port.
 func (s *Scanner) PortScan(ctx context.Context, ip string) error {
+	// port_scan работает только по IP. Доменное имя сюда попасть не должно:
+	// scope-guard разрешает и домены, поэтому без этой проверки разрешённый
+	// домен обошёл бы этап резолва и был бы передан в nmap напрямую.
+	if net.ParseIP(ip) == nil {
+		return fmt.Errorf("port_scan требует IP-адрес, получено %q", ip)
+	}
 	if d := s.guard.Check(ip); !d.Allowed {
 		return fmt.Errorf("scope-guard заблокировал цель %q: %s", ip, d.Reason)
 	}

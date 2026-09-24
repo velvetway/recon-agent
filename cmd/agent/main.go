@@ -17,6 +17,7 @@ import (
 
 	"github.com/velvet1way/recon-agent/internal/config"
 	"github.com/velvet1way/recon-agent/internal/graph"
+	"github.com/velvet1way/recon-agent/internal/mcpserver"
 	"github.com/velvet1way/recon-agent/internal/orchestrator"
 	"github.com/velvet1way/recon-agent/internal/queue"
 	"github.com/velvet1way/recon-agent/internal/scanner"
@@ -27,6 +28,7 @@ func main() {
 	var (
 		scopePath = flag.String("scope", "configs/scope.yaml", "путь к scope-конфигу")
 		checkOnly = flag.String("check", "", "проверить цель через scope-guard и выйти")
+		mcpMode   = flag.Bool("mcp", false, "запустить MCP-сервер по stdio (LLM управляет разведкой)")
 		outDir    = flag.String("out", "output", "директория для результатов сканов")
 		neo4jURI  = flag.String("neo4j", envOr("NEO4J_URI", "neo4j://localhost:7687"), "URI Neo4j")
 		neo4jUser = flag.String("neo4j-user", envOr("NEO4J_USER", "neo4j"), "пользователь Neo4j")
@@ -104,6 +106,20 @@ func main() {
 
 	orch := orchestrator.New(guard, q, log)
 	scan = scanner.New(guard, store, orch, *outDir, log)
+
+	// Режим MCP: разведкой управляет LLM через инструменты по stdio.
+	// Стартовые задачи не сеются — модель сама решает следующий шаг.
+	if *mcpMode {
+		srv := mcpserver.New(sc, guard, store, orch, log)
+		err := srv.ServeStdio(ctx, os.Stdin, os.Stdout)
+		log.Info("MCP-сервер остановлен, ждём завершения задач")
+		q.Shutdown()
+		if err != nil && ctx.Err() == nil {
+			fatal(log, "MCP-сервер", err)
+		}
+		return
+	}
+
 	roots := sc.RootDomains()
 	log.Info("старт разведки", "program", sc.Program, "roots", roots)
 	orch.SeedFromScope(ctx, roots)
